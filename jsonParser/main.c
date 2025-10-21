@@ -466,7 +466,19 @@ parse_result parse_array(json_token *tokens, unsigned long long *token) {
                 return result;
                 break;
             case JSON_TOKEN_LBRACE:
-                parse_object(tokens, token);
+                value++;
+                if (value >= 2 && comma == 0) {
+                    result.result = FAILED;
+                    result.text = "Comma expected";
+                    return result;
+                }
+                if (value == 2 && comma == 1) {
+                    comma = 0;
+                    value = 0;
+                }
+                parse_result object_result = parse_object(tokens, token);
+                if (object_result.result == FAILED)
+                    return object_result;
                 break;
             case JSON_TOKEN_RBRACE:
                 result.result = FAILED;
