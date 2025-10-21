@@ -174,6 +174,7 @@ int main(int argc, char *argv[]) {
                     printf("UNKNOWN TOKEN\n");
             }
             tok++; // Move to the next token in the array
+
         }
 
         if (result.result == SUCCESS) {
