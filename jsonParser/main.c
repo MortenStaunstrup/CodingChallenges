@@ -192,7 +192,6 @@ int main(int argc, char *argv[]) {
 
         free(tokens);
         free(jsonText);
-
     }
     return 0;
 }
