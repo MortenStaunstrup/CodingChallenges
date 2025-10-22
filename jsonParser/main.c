@@ -67,7 +67,7 @@ json_token parse_literal(char **iter, unsigned long long *textCurrentPos, unsign
 int main(int argc, char *argv[]) {
     if (argc == 2) {
 
-        /*
+
         DIR *dir;
         dir = opendir("C:\\Users\\mort4\\Downloads\\test");
 
@@ -115,9 +115,8 @@ int main(int argc, char *argv[]) {
         }
 
         closedir(dir);
-        */
 
-
+        /*
         char *jsonText = loadfile(argv[1]);
         if (jsonText == NULL) {
             perror("Error loading file\n");
@@ -191,7 +190,7 @@ int main(int argc, char *argv[]) {
         }
 
         free(tokens);
-        free(jsonText);
+        free(jsonText); */
     }
     return 0;
 }
@@ -435,47 +434,23 @@ parse_result parse_array(json_token *tokens, unsigned long long *token) {
 
     parse_result result;
 
-    int value = 0;
-    int comma = 0;
-    while (tokens[*token].kind != JSON_TOKEN_EOF) {
+    int lastTokenValue = 0;
+    int lastTokenComma = 0;
 
-        switch (tokens[*token].kind) {
-            case JSON_TOKEN_LBRACKET:
-                value++;
-                if (value >= 2 && comma == 0) {
-                    result.result = FAILED;
-                    result.text = "Comma expected";
-                    return result;
-                }
-                if (value == 2 && comma == 1) {
-                    comma = 0;
-                    value = 0;
-                }
+    // check the first token after LBRACKET for expected value
+
+    switch (tokens[*token].kind) {
+        case JSON_TOKEN_LBRACKET:
                 parse_result array_result = parse_array(tokens, token);
                 if (array_result.result == FAILED)
                     return array_result;
                 break;
             case JSON_TOKEN_RBRACKET:
-                if (comma > 0) {
-                    result.result = FAILED;
-                    result.text = "Trailing comma";
-                    return result;
-                }
                 result.result = SUCCESS;
                 result.text = "";
                 return result;
                 break;
             case JSON_TOKEN_LBRACE:
-                value++;
-                if (value >= 2 && comma == 0) {
-                    result.result = FAILED;
-                    result.text = "Comma expected";
-                    return result;
-                }
-                if (value == 2 && comma == 1) {
-                    comma = 0;
-                    value = 0;
-                }
                 parse_result object_result = parse_object(tokens, token);
                 if (object_result.result == FAILED)
                     return object_result;
@@ -486,89 +461,140 @@ parse_result parse_array(json_token *tokens, unsigned long long *token) {
                 return result;
                 break;
             case JSON_TOKEN_COMMA:
-                comma++;
-                if (comma > 1) {
                     result.result = FAILED;
                     result.text = "Value expected";
                     return result;
-                }
-                if (value < 1) {
-                    result.result = FAILED;
-                    result.text = "Value expected";
-                    return result;
-                }
-                value = 0;
                 break;
             case JSON_TOKEN_COLON:
                 result.result = FAILED;
-                if (comma >= 0 && value == 0) {
+                result.text = "Value expected";
+                return result;
+                break;
+            case JSON_TOKEN_EOF:
+                result.result = FAILED;
+                result.text = "EOF reached without closing bracket";
+                return result;
+                break;
+            case JSON_TOKEN_ILLEGAL:
+                result.result = FAILED;
+                result.text = "Illegal token";
+                if (tokens[*token].value.strValue != NULL)
+                    result.text = tokens[*token].value.strValue;
+                return result;
+                break;
+            default:
+                lastTokenValue = 1;
+    }
+
+    (*token)++;
+
+
+    while (tokens[*token].kind != JSON_TOKEN_EOF) {
+
+        switch (tokens[*token].kind) {
+            case JSON_TOKEN_LBRACKET:
+                if (lastTokenValue == 1) {
+                    result.result = FAILED;
+                    result.text = "Comma expected";
+                    return result;
+                }
+                parse_result array_result = parse_array(tokens, token);
+                if (array_result.result == FAILED)
+                    return array_result;
+                lastTokenValue = 1;
+                lastTokenComma = 0;
+                break;
+            case JSON_TOKEN_RBRACKET:
+                if (lastTokenComma == 1) {
+                    result.result = FAILED;
+                    result.text = "Trailing comma";
+                    return result;
+                }
+                result.result = SUCCESS;
+                result.text = "";
+                return result;
+                break;
+            case JSON_TOKEN_LBRACE:
+                if (lastTokenValue == 1) {
+                    result.result = FAILED;
+                    result.text = "Comma expected";
+                    return result;
+                }
+                parse_result object_result = parse_object(tokens, token);
+                lastTokenValue = 1;
+                lastTokenComma = 0;
+                if (object_result.result == FAILED)
+                    return object_result;
+                break;
+            case JSON_TOKEN_RBRACE:
+                result.result = FAILED;
+                result.text = "} is invalid at this point";
+                return result;
+                break;
+            case JSON_TOKEN_COMMA:
+                if (lastTokenComma == 1) {
+                    result.result = FAILED;
                     result.text = "Value expected";
                     return result;
                 }
-                if (value > 0 && comma == 0) {
+                lastTokenValue = 0;
+                lastTokenComma = 1;
+                break;
+            case JSON_TOKEN_COLON:
+                result.result = FAILED;
+                if (lastTokenComma == 1) {
+                    result.text = "Value expected";
+                    return result;
+                }
+                if (lastTokenValue == 1) {
                     result.text = "Comma expected";
                     return result;
                 }
                 break;
             case JSON_TOKEN_STRING:
-                value++;
-                if (value >= 2 && comma == 0) {
+                if (lastTokenValue == 1) {
                     result.result = FAILED;
                     result.text = "Comma expected";
                     return result;
                 }
-                if (value == 2 && comma == 1) {
-                    comma = 0;
-                    value = 0;
-                }
+                lastTokenValue = 1;
+                lastTokenComma = 0;
                 break;
             case JSON_TOKEN_NUMBER:
-                value++;
-                if (value >= 2 && comma == 0) {
+                if (lastTokenValue == 1) {
                     result.result = FAILED;
                     result.text = "Comma expected";
                     return result;
                 }
-                if (value == 2 && comma == 1) {
-                    comma = 0;
-                    value = 0;
-                }
+                lastTokenValue = 1;
+                lastTokenComma = 0;
                 break;
             case JSON_TOKEN_BOOLEAN_TRUE:
-                value++;
-                if (value >= 2 && comma == 0) {
+                if (lastTokenValue == 1) {
                     result.result = FAILED;
                     result.text = "Comma expected";
                     return result;
                 }
-                if (value == 2 && comma == 1) {
-                    comma = 0;
-                    value = 0;
-                }
+                lastTokenValue = 1;
+                lastTokenComma = 0;
                 break;
             case JSON_TOKEN_BOOLEAN_FALSE:
-                value++;
-                if (value >= 2 && comma == 0) {
+                if (lastTokenValue == 1) {
                     result.result = FAILED;
                     result.text = "Comma expected";
                     return result;
                 }
-                if (value == 2 && comma == 1) {
-                    comma = 0;
-                    value = 0;
-                }
+                lastTokenValue = 1;
+                lastTokenComma = 0;
                 break;
             case JSON_TOKEN_NULL:
-                value++;
-                if (value >= 2 && comma == 0) {
+                if (lastTokenValue == 1) {
                     result.result = FAILED;
                     result.text = "Comma expected";
                     return result;
                 }
-                if (value == 2 && comma == 1) {
-                    comma = 0;
-                    value = 0;
-                }
+                lastTokenValue = 1;
+                lastTokenComma = 0;
                 break;
             case JSON_TOKEN_EOF:
                 result.result = FAILED;
