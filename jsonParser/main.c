@@ -44,6 +44,8 @@ typedef struct json_token {
 typedef struct parse_result {
     enum result result;
     char* text;
+    unsigned long long pos;
+    unsigned long long line;
 } parse_result;
 
 parse_result parse_unicode(char **iter, unsigned long long *textCurrentPos, char *buffer, int *i);
@@ -59,64 +61,17 @@ char *loadfile(char *text);
 json_token *lexor(char *text, unsigned long long textLength);
 json_token parse_numeric(char **iter, unsigned long long *textCurrentPos, unsigned long long *textLine);
 json_token parse_literal(char **iter, unsigned long long *textCurrentPos, unsigned long long *textLine);
-
-// TODO: fail29 and fail31
-// TODO: Must be able to pass pass1.json
+int parser_test();
 
 
 int main(int argc, char *argv[]) {
+
+    if (argc == 1) {
+        printf("Usage: parse <filename>\n");
+    }
+
     if (argc == 2) {
 
-
-        DIR *dir;
-        dir = opendir("C:\\Users\\mort4\\Downloads\\test");
-
-        if (!dir) {
-            perror("Directory could not be accessed");
-            return 1;
-        }
-
-        struct dirent *entry;
-
-        while ((entry = readdir(dir)) != NULL) {
-
-            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-                continue;
-
-            char fullpath[1024];
-            // Adjust length as needed
-            snprintf(fullpath, sizeof(fullpath), "C:\\Users\\mort4\\Downloads\\test\\%s", entry->d_name);
-            char *jsonText = loadfile(fullpath);
-
-            if (jsonText == NULL) {
-                perror("Could not load file");
-            }
-
-            json_token *tokens = lexor(jsonText, strlen(jsonText));
-
-            parse_result result = parser(tokens);
-
-            if (result.result == FAILED) {
-                printf("%s FAILED: %s\n", entry -> d_name, result.text);
-            } else if (result.result == SUCCESS) {
-                printf("%s SUCCESS\n", entry -> d_name);
-            }
-
-            size_t token = 0;
-            while (tokens[token].kind != JSON_TOKEN_EOF && tokens[token].kind != JSON_TOKEN_ILLEGAL) {
-                if (tokens[token].kind == JSON_TOKEN_STRING) {
-                    free(tokens[token].value.strValue);
-                }
-                token++;
-            }
-
-            free(tokens);
-            free(jsonText);
-        }
-
-        closedir(dir);
-
-        /*
         char *jsonText = loadfile(argv[1]);
         if (jsonText == NULL) {
             perror("Error loading file\n");
@@ -179,8 +134,10 @@ int main(int argc, char *argv[]) {
             printf("SUCCESS\n");
         } else if (result.result == FAILED) {
             printf("FAILED: %s\n", result.text);
+            printf("At line: %llu pos: %llu\n", result.line, result.pos);
         }
 
+        // Frees the strValue memory
         size_t token = 0;
         while (tokens[token].kind != JSON_TOKEN_EOF && tokens[token].kind != JSON_TOKEN_ILLEGAL) {
             if (tokens[token].kind == JSON_TOKEN_STRING || tokens[token].kind == JSON_TOKEN_ILLEGAL) {
@@ -190,8 +147,65 @@ int main(int argc, char *argv[]) {
         }
 
         free(tokens);
-        free(jsonText); */
+        free(jsonText);
     }
+
+    if (argc > 2) {
+        printf("Too many arguments\n");
+    }
+
+    return 0;
+}
+
+int parser_test() {
+    DIR *dir;
+    dir = opendir("C:\\Users\\mort4\\Downloads\\test");
+
+    if (!dir) {
+        perror("Directory could not be accessed");
+        return 1;
+    }
+
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL) {
+
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        char fullpath[1024];
+        // Adjust length as needed
+        snprintf(fullpath, sizeof(fullpath), "C:\\Users\\mort4\\Downloads\\test\\%s", entry->d_name);
+        char *jsonText = loadfile(fullpath);
+
+        if (jsonText == NULL) {
+            perror("Could not load file");
+        }
+
+        json_token *tokens = lexor(jsonText, strlen(jsonText));
+
+        parse_result result = parser(tokens);
+
+        if (result.result == FAILED) {
+            printf("%s FAILED: %s\n", entry -> d_name, result.text);
+            printf("At line: %llu pos: %llu\n", result.line, result.pos);
+        } else if (result.result == SUCCESS) {
+            printf("%s SUCCESS\n", entry -> d_name);
+        }
+
+        size_t token = 0;
+        while (tokens[token].kind != JSON_TOKEN_EOF && tokens[token].kind != JSON_TOKEN_ILLEGAL) {
+            if (tokens[token].kind == JSON_TOKEN_STRING) {
+                free(tokens[token].value.strValue);
+            }
+            token++;
+        }
+
+        free(tokens);
+        free(jsonText);
+    }
+
+    closedir(dir);
     return 0;
 }
 
@@ -212,11 +226,10 @@ parse_result parser(json_token *tokens) {
             if (tokens[token].kind != JSON_TOKEN_EOF) {
                 token--;
                 parse_result result;
-                char *buffer = malloc(MAX_TEXT_SIZE);
-                snprintf(buffer, MAX_TEXT_SIZE,
-                    "Expected end of file at line: %llu pos: %llu", tokens[token].line, tokens[token].pos);
                 result.result = FAILED;
-                result.text = buffer;
+                result.pos = tokens[token].pos;
+                result.line = tokens[token].line;
+                result.text = "Expected end of file";
                 return result;
             }
         }
@@ -230,11 +243,10 @@ parse_result parser(json_token *tokens) {
             if (tokens[token].kind != JSON_TOKEN_EOF) {
                 token--;
                 parse_result result;
-                char *buffer = malloc(MAX_TEXT_SIZE);
-                snprintf(buffer, MAX_TEXT_SIZE,
-                    "Expected end of file at line: %llu pos: %llu", tokens[token].line, tokens[token].pos);
                 result.result = FAILED;
-                result.text = buffer;
+                result.pos = tokens[token].pos;
+                result.line = tokens[token].line;
+                result.text = "Expected end of file";
                 return result;
             }
         }
@@ -258,7 +270,8 @@ parse_result parse_object(json_token *tokens, unsigned long long *token) {
     int comma = 0;
     int value = 0;
     while (tokens[*token].kind != JSON_TOKEN_EOF) {
-
+        result.line = tokens[*token].line;
+        result.pos = tokens[*token].pos;
         switch (tokens[*token].kind) {
             case JSON_TOKEN_STRING:
                 key++;
@@ -439,6 +452,9 @@ parse_result parse_array(json_token *tokens, unsigned long long *token) {
 
     // check the first token after LBRACKET for expected value
 
+    result.line = tokens[*token].line;
+    result.pos = tokens[*token].pos;
+
     switch (tokens[*token].kind) {
         case JSON_TOKEN_LBRACKET:
                 parse_result array_result = parse_array(tokens, token);
@@ -490,7 +506,8 @@ parse_result parse_array(json_token *tokens, unsigned long long *token) {
 
 
     while (tokens[*token].kind != JSON_TOKEN_EOF) {
-
+        result.line = tokens[*token].line;
+        result.pos = tokens[*token].pos;
         switch (tokens[*token].kind) {
             case JSON_TOKEN_LBRACKET:
                 if (lastTokenValue == 1) {
