@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
 
 int parser_test() {
     DIR *dir;
-    dir = opendir("C:\\Users\\mort4\\Downloads\\test");
+    dir = opendir("FULL PATH TO DIRECTORY");
 
     if (!dir) {
         perror("Directory could not be accessed");
@@ -175,7 +175,7 @@ int parser_test() {
 
         char fullpath[1024];
         // Adjust length as needed
-        snprintf(fullpath, sizeof(fullpath), "C:\\Users\\mort4\\Downloads\\test\\%s", entry->d_name);
+        snprintf(fullpath, sizeof(fullpath), "FULL PATH TO DIRECTORY", entry->d_name);
         char *jsonText = loadfile(fullpath);
 
         if (jsonText == NULL) {
@@ -456,30 +456,32 @@ parse_result parse_array(json_token *tokens, unsigned long long *token) {
     result.pos = tokens[*token].pos;
 
     switch (tokens[*token].kind) {
-        case JSON_TOKEN_LBRACKET:
+        case JSON_TOKEN_LBRACKET:{
                 parse_result array_result = parse_array(tokens, token);
                 if (array_result.result == FAILED)
                     return array_result;
                 break;
+            } // Curly braces because gcc complier requires it now when declaring variables?????
             case JSON_TOKEN_RBRACKET:
                 result.result = SUCCESS;
                 result.text = "";
                 return result;
                 break;
-            case JSON_TOKEN_LBRACE:
+            case JSON_TOKEN_LBRACE: {
                 parse_result object_result = parse_object(tokens, token);
                 if (object_result.result == FAILED)
                     return object_result;
                 break;
+            }
             case JSON_TOKEN_RBRACE:
                 result.result = FAILED;
                 result.text = "} is invalid at this point";
                 return result;
                 break;
             case JSON_TOKEN_COMMA:
-                    result.result = FAILED;
-                    result.text = "Value expected";
-                    return result;
+                result.result = FAILED;
+                result.text = "Value expected";
+                return result;
                 break;
             case JSON_TOKEN_COLON:
                 result.result = FAILED;
