@@ -26,7 +26,7 @@ typedef struct HuffmanNode {
     unsigned long val;
     unsigned long weight;
     enum kind kind;
-    struct HuffmanNode* left, *right;
+    struct HuffmanNode *left, *right;
 } HuffmanNode;
 
 typedef struct HuffmanTree {
@@ -39,7 +39,11 @@ typedef struct PriorityQueue {
     HuffmanTree *trees;
 } PriorityQueue;
 
-
+typedef struct CodeBucket {
+    uint32_t key;
+    unsigned long val;
+    int code;
+} CodeBucket;
 
 char* handle_file(const char* text);
 void incr(uint32_t key);
@@ -52,8 +56,13 @@ void init_priorityqueue(PriorityQueue *pq, HuffmanNode *sortedArray);
 void add_to_queue(PriorityQueue *pq, HuffmanTree tree);
 void swap_queue(HuffmanTree *a, HuffmanTree *b);
 void display_queue(PriorityQueue *pq);
-HuffmanTree delete(PriorityQueue *pq);
+HuffmanTree delete_from_queue(PriorityQueue *pq);
 int isEmpty(PriorityQueue *pq);
+HuffmanTree create_huffman_tree(PriorityQueue *pq);
+void print_huffman_tree(const HuffmanNode *node, int depth);
+CodeBucket* create_code_bucket(HuffmanTree *tree);
+void traverse_tree(long long *index, CodeBucket *buffer, HuffmanNode *curr, int currPrefix, bool isFirst);
+void print_code_table(CodeBucket *code_table);
 
 // Knuth's hash function
 // Returns index
@@ -90,17 +99,102 @@ int main(const int argc, char* argv[]) {
         init_priorityqueue(&pq, array);
         display_queue(&pq);
 
+        HuffmanTree tree = create_huffman_tree(&pq);
+        print_huffman_tree(tree.root, 0);
+
+        CodeBucket *code_table = create_code_bucket(&tree);
+        print_code_table(code_table);
+
         free(array);
+        free(code_table);
+        free(text);
+        free(pq.trees);
     }
 
     return 0;
+}
+
+void print_code_table(CodeBucket *code_table) {
+    if (!code_table) {
+        printf("Code table is empty\n");
+        return;
+    }
+
+    for (long long i = 0; i < tableCount; i++) {
+        printf("Index: %lld Code-point: U+%04X Code: %u\n", i, code_table[i].key, code_table[i].code);
+    }
+}
+
+void traverse_tree(long long *index, CodeBucket *buffer, HuffmanNode *curr, int currPrefix, bool isFirst) {
+    if (!curr) return;
+
+    if (isFirst) {
+        if (curr->kind == INTERNAL_NODE) {
+            traverse_tree(index, buffer, curr->left, 0, false);
+            traverse_tree(index, buffer, curr->right, 1, false);
+        } else {
+            buffer[*index].key = curr->key; buffer[*index].val = curr->val; buffer[*index].code = 0;
+            return;
+        }
+    } else {
+        if (curr->kind == INTERNAL_NODE) {
+            traverse_tree(index, buffer, curr->left, currPrefix * 10, false);
+            traverse_tree(index, buffer, curr->right, currPrefix * 10 + 1, false);
+        } else {
+            buffer[*index].key = curr->key, buffer[*index].val = curr->val; buffer[*index].code = currPrefix;
+            (*index)++;
+        }
+    }
+
+}
+
+CodeBucket* create_code_bucket(HuffmanTree *tree) {
+    CodeBucket *buffer = malloc(sizeof(CodeBucket) * tableCount);
+    int currPrefix = 0;
+    long long index = 0;
+    traverse_tree(&index, buffer, tree->root, currPrefix, true);
+    return buffer;
+}
+
+void print_huffman_tree(const HuffmanNode *node, int depth) {
+    if (!node) return;
+
+    for (int i = 0; i < depth; ++i)
+        printf("  "); // Indent for tree visualization
+
+    if (node->kind == LEAF_NODE) {
+        printf("Leaf: key=U+%04X, val=%lu, weight=%lu\n", node->key, node->val, node->weight);
+    } else {
+        printf("Internal: weight=%lu\n", node->weight);
+        print_huffman_tree(node->left, depth+1);
+        print_huffman_tree(node->right, depth+1);
+    }
+}
+
+HuffmanTree create_huffman_tree(PriorityQueue *pq) {
+    HuffmanTree tmp1, tmp2, tmp3;
+
+    while (pq->size > 1) {
+        tmp1 = delete_from_queue(pq);
+        tmp2 = delete_from_queue(pq);
+
+        tmp3.root = malloc(sizeof(HuffmanNode));
+        tmp3.root->key = -1;
+        tmp3.root->val = 0;
+        tmp3.root->weight = tmp1.weight + tmp2.weight;
+        tmp3.root->kind = INTERNAL_NODE;
+        tmp3.root->left = tmp1.root; tmp3.root->right = tmp2.root;
+        tmp3.weight = tmp1.weight + tmp2.weight;
+        add_to_queue(pq, tmp3);
+    }
+    return delete_from_queue(pq);
 }
 
 int isEmpty(PriorityQueue *pq) {
     return pq->size == 0;
 }
 
-HuffmanTree delete(PriorityQueue *pq){
+HuffmanTree delete_from_queue(PriorityQueue *pq){
     if (isEmpty(pq)) {
         printf("Queue is empty\n");
         exit(-1);
@@ -112,7 +206,7 @@ HuffmanTree delete(PriorityQueue *pq){
     int i = 0;
     while (true) {
         int left = 2 * i + 1, right = 2 * i + 2, smallest = i;
-        // Check if the left or right node is smaller than than the current node, then swap to keep integrity of min-heap
+        // Check if the left or right node is smaller than the current node, then swap to keep integrity of min-heap
         if (left < pq->size && pq->trees[left].weight < pq->trees[smallest].weight)
             smallest = left;
         if (right < pq->size && pq->trees[right].weight < pq->trees[smallest].weight)
@@ -144,6 +238,7 @@ void swap_queue(HuffmanTree *a, HuffmanTree *b) {
 void init_priorityqueue(PriorityQueue *pq, HuffmanNode *sortedArray) {
     pq->size = 0;
     pq->trees = malloc(tableCount * sizeof(HuffmanTree));
+    // All single Huffman nodes start out being trees, finally being merged to be 1 tree later
     for (int i = 0; i < tableCount; i++) {
         HuffmanTree tree;
         tree.weight = sortedArray[i].weight;
@@ -222,7 +317,7 @@ char* handle_file(const char* text) {
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
     rewind(f);
-    char* buffer = (char*)malloc(fsize + 1);
+    char* buffer = malloc(fsize + 1);
     buffer[fsize] = '\0';
     fread(buffer, 1, fsize, f);
     fclose(f);
