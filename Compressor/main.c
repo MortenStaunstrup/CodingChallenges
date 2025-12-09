@@ -355,7 +355,6 @@ void write_bytes_outputfile(FILE *outFile, char *filePointer) {
 }
 
 char* remove_txt_file_extension(char *fileName) {
-    // removes the .txt
     char* result = malloc(strlen(fileName) - 4);
     strncpy(result, fileName, strlen(fileName) - 4);
     result[strlen(fileName) - 4] = '\0';
@@ -405,6 +404,7 @@ int main(int argc, char *argv[]) {
         printf("%s\n", newName);
         FILE *compressedFile = fopen(newName, "wb");
         free(newName);
+        free(fileNameNoExtension);
         if (compressedFile == NULL) {
             perror("Could not write to file");
             exit(1);
@@ -435,8 +435,17 @@ int main(int argc, char *argv[]) {
         free(file);
         // Free the Huffmannode Container
         free(container);
+    } else if (argc == 3) {
+        if (strcmp(argv[2], "-o") == 0) {
+            printf("Use %s -h for help", argv[0]);
+            return 0;
+        }
+    } else if (argc == 4) {
+        if (strcmp(argv[2], "-o") == 0) {
+            // TODO same but with new name
+        }
     } else {
-        fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+        printf("Usage: %s <filename>\n", argv[0]);
         return 1;
     }
     return 0;
