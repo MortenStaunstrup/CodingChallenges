@@ -324,7 +324,8 @@ void write_bit_to_file(FILE* outputFile, int bit, int* bitsInBuffer, unsigned ch
     (*bitsInBuffer)++;
 
     if (*bitsInBuffer == 8) {
-        fwrite(byte, sizeof(byte), 1, outputFile);
+        // size used to be sizeof(byte) which was size of pointer (usually 8 bytes) which was obv wrong
+        fwrite(byte, 1, 1, outputFile);
         *byte = 0;
         *bitsInBuffer = 0;
     }
@@ -404,6 +405,7 @@ int main(int argc, char *argv[]) {
         fprintf(compressedFile, "%lld\n", nodeCount);
 
         // Write the codepoints, prefix length, prefix then new line char
+
         for (int i = 0; i < MAX_TABLE_SIZE; i++) {
             for (Node *n = table[i]; n; n = n->next) {
                 fprintf(compressedFile, "%u %lu %u ", n->codepoint, n->freq, n->prefixSize);
