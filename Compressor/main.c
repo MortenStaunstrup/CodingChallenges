@@ -442,7 +442,7 @@ int main(int argc, char *argv[]) {
         }
     } else if (argc == 4) {
         if (strcmp(argv[2], "-o") == 0) {
-            // TODO same but with new name
+            // TODO same but with new namef
         }
     } else {
         printf("Usage: %s <filename>\n", argv[0]);
