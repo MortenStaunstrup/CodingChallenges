@@ -354,6 +354,14 @@ void write_bytes_outputfile(FILE *outFile, char *filePointer) {
     }
 }
 
+char* remove_txt_file_extension(char *fileName) {
+    // removes the .txt
+    char* result = malloc(strlen(fileName) - 4);
+    strncpy(result, fileName, strlen(fileName) - 4);
+    result[strlen(fileName) - 4] = '\0';
+    return result;
+}
+
 int main(int argc, char *argv[]) {
     char *localeSet = setlocale(LC_ALL, "");
     if (localeSet == NULL) {
@@ -392,7 +400,8 @@ int main(int argc, char *argv[]) {
 
         print_table(true);
 
-        char *newName = concat(argv[1], "-compressed.txt");
+        char *fileNameNoExtension = remove_txt_file_extension(argv[1]);
+        char *newName = concat(fileNameNoExtension, "-compressed.txt");
         printf("%s\n", newName);
         FILE *compressedFile = fopen(newName, "wb");
         free(newName);
@@ -419,7 +428,6 @@ int main(int argc, char *argv[]) {
         char *orgFilePointer = file;
 
         write_bytes_outputfile(compressedFile, orgFilePointer);
-        // TODO test the write bit functions
 
         fclose(compressedFile);
 
