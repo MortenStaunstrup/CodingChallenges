@@ -40,6 +40,18 @@ typedef struct PriorityQueue {
     int size;
 } PriorityQueue;
 
+typedef struct DecodeBucket {
+    uint32_t codepoint;
+    int prefix[MAX_PREFIX_LENGTH];
+    int prefixSize;
+} DecodeBucket;
+
+typedef struct DecodeNode {
+    uint32_t codepoint;
+    struct DecodeNode *left;
+    struct DecodeNode *right;
+} DecodeNode;
+
 Node *table[MAX_TABLE_SIZE];
 long long nodeCount = 0;
 
@@ -361,6 +373,19 @@ char* remove_txt_file_extension(char *fileName) {
     return result;
 }
 
+void help() {
+    printf("Usage: <filename> compresses the file\n");
+    printf("Parameters:\n");
+    printf("-o | Usage: <filename> -o <newfilename> | Gives name to compressed file\n");
+    printf("-d | Usage: <compressedfile> -d | Decompresses compressed file\n");
+}
+
+void print_decode_bucket(DecodeBucket *arr, unsigned int arrLength) {
+    for (int i = 0; i < arrLength; i++) {
+        printf("Codepoint: %u prefixSize: %u\n", arr[i].codepoint, arr[i].prefixSize);
+    }
+}
+
 int main(int argc, char *argv[]) {
     char *localeSet = setlocale(LC_ALL, "");
     if (localeSet == NULL) {
@@ -368,7 +393,15 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    if (argc == 2) {
+    if (argc == 2 || argc == 4) {
+        if (argc == 4 && strcmp(argv[2], "-o") != 0) {
+            printf("Expected parameter -o\n");
+            exit(1);
+        }
+        if (strcmp(argv[1], "-h") == 0) {
+            help();
+            exit(0);
+        }
         char *file = handle_file(argv[1]);
         char *p = file;
         int len = 0;
@@ -399,12 +432,18 @@ int main(int argc, char *argv[]) {
 
         print_table(true);
 
-        char *fileNameNoExtension = remove_txt_file_extension(argv[1]);
-        char *newName = concat(fileNameNoExtension, "-compressed.txt");
-        printf("%s\n", newName);
-        FILE *compressedFile = fopen(newName, "wb");
-        free(newName);
-        free(fileNameNoExtension);
+        char* name;
+        // Determine the file name
+        if (argc == 4) {
+            name = argv[3];
+        } else {
+            char *fileNameNoExtension = remove_txt_file_extension(argv[1]);
+            name = concat(fileNameNoExtension, "-compressed.txt");
+            printf("%s\n", name);
+            free(fileNameNoExtension);
+        }
+        FILE *compressedFile = fopen(name, "wb");
+        free(name);
         if (compressedFile == NULL) {
             perror("Could not write to file");
             exit(1);
@@ -417,7 +456,7 @@ int main(int argc, char *argv[]) {
 
         for (int i = 0; i < MAX_TABLE_SIZE; i++) {
             for (Node *n = table[i]; n; n = n->next) {
-                fprintf(compressedFile, "%u %lu %u ", n->codepoint, n->freq, n->prefixSize);
+                fprintf(compressedFile, "%u %u ", n->codepoint, n->prefixSize);
                 for (int j = 0; j < n->prefixSize; j++) {
                     fprintf(compressedFile, "%u", n->prefix[j]);
                 }
@@ -436,13 +475,60 @@ int main(int argc, char *argv[]) {
         // Free the Huffmannode Container
         free(container);
     } else if (argc == 3) {
-        if (strcmp(argv[2], "-o") == 0) {
-            printf("Use %s -h for help", argv[0]);
-            return 0;
-        }
-    } else if (argc == 4) {
-        if (strcmp(argv[2], "-o") == 0) {
-            // TODO same but with new namef
+        if (strcmp(argv[2], "-d") == 0) {
+            char *fileToDecompress = handle_file(argv[1]);
+            char *p = fileToDecompress;
+
+            unsigned int nodesCount = 0;
+            while (*p != '\n') {
+                nodesCount = nodesCount * 10 + (*p - '0');
+                p++;
+            }
+            // skip newline char
+            p++;
+            printf("Amount of nodes: %u\n", nodesCount);
+
+            DecodeBucket *bucketArray = malloc(nodesCount * sizeof(DecodeBucket));
+
+            int currNode = 0;
+            DecodeBucket bucket;
+            uint32_t codepoint = 0;
+            int prefixSize = 0;
+            while (currNode < nodesCount) {
+                memset(&bucket, 0, sizeof(bucket));
+                // decode codepoint
+                while (*p != ' ') {
+                    codepoint = codepoint * 10 + (*p - '0');
+                    p++;
+                }
+                p++;
+
+                // decode prefixSize
+                while (*p != ' ') {
+                    prefixSize = prefixSize * 10 + (*p - '0');
+                    p++;
+                }
+                p++;
+
+                // decode prefix
+                for (int i = 0; i < prefixSize; i++) {
+                    bucket.prefix[i] = (*p - '0');
+                    p++;
+                }
+                p++;
+
+                bucket.codepoint = codepoint;
+                bucket.prefixSize = prefixSize;
+                codepoint = 0;
+                prefixSize = 0;
+                bucketArray[currNode] = bucket;
+                currNode++;
+            }
+
+            print_decode_bucket(bucketArray, nodesCount);
+
+            free(bucketArray);
+            free(fileToDecompress);
         }
     } else {
         printf("Usage: %s <filename>\n", argv[0]);
