@@ -52,6 +52,10 @@ typedef struct DecodeNode {
     struct DecodeNode *right;
 } DecodeNode;
 
+typedef struct DecodeTree {
+    struct DecodeNode *root;
+} DecodeTree;
+
 Node *table[MAX_TABLE_SIZE];
 long long nodeCount = 0;
 
@@ -386,6 +390,68 @@ void print_decode_bucket(DecodeBucket *arr, unsigned int arrLength) {
     }
 }
 
+DecodeTree* create_decoding_tree(DecodeBucket *bucketArray, unsigned int arrLength) {
+    DecodeTree* tree = malloc(sizeof(DecodeTree));
+    tree->root = malloc(sizeof(DecodeNode));
+    tree->root->codepoint = -1;
+    tree->root->left = nullptr;
+    tree->root->right = nullptr;
+    for (int i = 0; i < arrLength; i++) {
+        DecodeNode* currNode = tree->root;
+        for (int j = 0; j < bucketArray[i].prefixSize; j++) {
+            // Go left in the tree
+            if (bucketArray[i].prefix[j] == 0) {
+                if (currNode->left == nullptr) {
+                    currNode->left = malloc(sizeof(DecodeNode));
+                    currNode->left->codepoint = -1;
+                    currNode->left->left = nullptr;
+                    currNode->left->right = nullptr;
+                }
+                currNode = currNode->left;
+            }
+
+            // Go right in the tree
+            if (bucketArray[i].prefix[j] == 1) {
+                if (currNode->right == nullptr) {
+                    currNode->right = malloc(sizeof(DecodeNode));
+                    currNode->right->codepoint = -1;
+                    currNode->right->left = nullptr;
+                    currNode->right->right = nullptr;
+                }
+                currNode = currNode->right;
+            }
+
+            // If end of prefix reached = Create the node
+            if (j == bucketArray[i].prefixSize - 1) {
+                currNode->codepoint = bucketArray[i].codepoint;
+            }
+        }
+    }
+
+    return tree;
+}
+
+void print_decoding_tree(DecodeNode *node, int depth) {
+    if (node == nullptr) return;
+    for (int i = 0; i < depth; i++) {
+        printf(" ");
+    }
+
+
+    printf("Codepoint: U+%04X\n", node->codepoint);
+    print_decoding_tree(node->left, depth + 1);
+    print_decoding_tree(node->right, depth + 1);
+}
+
+void free_decoding_tree(DecodeNode* node) {
+    if (node == nullptr) {
+        return;
+    }
+    free_decoding_tree(node->left);
+    free_decoding_tree(node->right);
+    free(node);
+}
+
 int main(int argc, char *argv[]) {
     char *localeSet = setlocale(LC_ALL, "");
     if (localeSet == NULL) {
@@ -527,6 +593,12 @@ int main(int argc, char *argv[]) {
 
             print_decode_bucket(bucketArray, nodesCount);
 
+            DecodeTree *tree = create_decoding_tree(bucketArray, nodesCount);
+
+            print_decoding_tree(tree->root, 0);
+
+            free_decoding_tree(tree->root);
+            free(tree);
             free(bucketArray);
             free(fileToDecompress);
         }
