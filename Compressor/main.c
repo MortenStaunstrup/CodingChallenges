@@ -332,6 +332,39 @@ uint32_t decode_utf8_codepoint(char *p, int *len) {
     return codepoint;
 }
 
+// AI CODE!!
+// Writes UTF-8 bytes for `codepoint` into `out` buffer (must be at least 4 bytes).
+// Returns the number of bytes written (1..4), or 0 on error (invalid codepoint).
+int encode_utf8_codepoint(uint32_t codepoint, char *out) {
+    if (codepoint <= 0x7F) {
+        // 1-byte ASCII
+        out[0] = codepoint & 0x7F;
+        return 1;
+    } else if (codepoint <= 0x7FF) {
+        // 2-byte
+        out[0] = 0xC0 | ((codepoint >> 6) & 0x1F);
+        out[1] = 0x80 | (codepoint & 0x3F);
+        return 2;
+    } else if (codepoint <= 0xFFFF) {
+        // 3-byte
+        out[0] = 0xE0 | ((codepoint >> 12) & 0x0F);
+        out[1] = 0x80 | ((codepoint >> 6) & 0x3F);
+        out[2] = 0x80 | (codepoint & 0x3F);
+        return 3;
+    } else if (codepoint <= 0x10FFFF) {
+        // 4-byte
+        out[0] = 0xF0 | ((codepoint >> 18) & 0x07);
+        out[1] = 0x80 | ((codepoint >> 12) & 0x3F);
+        out[2] = 0x80 | ((codepoint >> 6) & 0x3F);
+        out[3] = 0x80 | (codepoint & 0x3F);
+        return 4;
+    } else {
+        // Out of range for Unicode
+        return 0;
+    }
+}
+
+// AI CODE
 void write_bit_to_file(FILE* outputFile, int bit, int* bitsInBuffer, unsigned char* byte) {
     if (bit & 1) {
         *byte |= (1 << (7 - *bitsInBuffer));
@@ -347,9 +380,11 @@ void write_bit_to_file(FILE* outputFile, int bit, int* bitsInBuffer, unsigned ch
     }
 }
 
-void write_bytes_outputfile(FILE *outFile, char *filePointer) {
+// AI CODE
+size_t write_bytes_outputfile(FILE *outFile, char *filePointer) {
     unsigned char byte = 0;
     int bitsInBuffer = 0;
+    size_t totalBitsWritten = 0;
 
     int utf8len = 0;
     while (*filePointer) {
@@ -360,6 +395,7 @@ void write_bytes_outputfile(FILE *outFile, char *filePointer) {
             for (Node *n = table[idx]; n; n = n->next) {
                 if (n->codepoint == codepoint) {
                     for (int i = 0; i < n->prefixSize; i++) {
+                        totalBitsWritten++;
                         write_bit_to_file(outFile, n->prefix[i], &bitsInBuffer, &byte);
                     }
                     break;
@@ -368,6 +404,7 @@ void write_bytes_outputfile(FILE *outFile, char *filePointer) {
         }
         filePointer += utf8len;
     }
+    return totalBitsWritten;
 }
 
 char* remove_txt_file_extension(char *fileName) {
@@ -452,6 +489,37 @@ void free_decoding_tree(DecodeNode* node) {
     free(node);
 }
 
+// AI CODE!!
+void write_chars_to_file(FILE* decompressedFile, char *p, DecodeTree *tree, size_t totalBits) {
+    DecodeNode* root = tree->root;
+    DecodeNode* currNode = root;
+
+    size_t bitIndex = 0;
+    size_t byteIndex = 0;
+
+    while (bitIndex < totalBits) {
+        unsigned char byte = p[byteIndex];
+        for (int i = 7; i >= 0 && bitIndex < totalBits; i--, bitIndex++) {
+            int bit = (byte >> i) & 1;
+
+            currNode = bit ? currNode->right : currNode->left;
+
+            if (currNode->codepoint != -1) {
+                char utf8_bytes[4] = {0};
+                int utf8len = encode_utf8_codepoint(currNode->codepoint, utf8_bytes);
+                if (utf8len > 0) {
+                    fwrite(utf8_bytes, 1, utf8len, decompressedFile);
+                } else {
+                    printf("Invalid utf8 char stored in decode tree");
+                    exit(1);
+                }
+                currNode = root;
+            }
+        }
+        byteIndex++;
+    }
+}
+
 int main(int argc, char *argv[]) {
     char *localeSet = setlocale(LC_ALL, "");
     if (localeSet == NULL) {
@@ -515,6 +583,9 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
+        // VITAL PART OF CODE, DO NOT TOUCH
+        // If nodeCount dissapears in header, print more newline chars
+        fprintf(compressedFile, "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
         // Write the amount of chars
         fprintf(compressedFile, "%lld\n", nodeCount);
 
@@ -532,7 +603,10 @@ int main(int argc, char *argv[]) {
 
         char *orgFilePointer = file;
 
-        write_bytes_outputfile(compressedFile, orgFilePointer);
+        size_t totalBits = write_bytes_outputfile(compressedFile, orgFilePointer);
+
+        rewind(compressedFile);
+        fprintf(compressedFile, "%lld\n", totalBits);
 
         fclose(compressedFile);
 
@@ -546,6 +620,17 @@ int main(int argc, char *argv[]) {
             char *p = fileToDecompress;
 
             unsigned int nodesCount = 0;
+            size_t totalBits = 0;
+
+            while (*p != '\n') {
+                totalBits = totalBits * 10 + (*p - '0');
+                p++;
+            }
+
+            while (*p == '\n') {
+                p++;
+            }
+
             while (*p != '\n') {
                 nodesCount = nodesCount * 10 + (*p - '0');
                 p++;
@@ -596,6 +681,15 @@ int main(int argc, char *argv[]) {
             DecodeTree *tree = create_decoding_tree(bucketArray, nodesCount);
 
             print_decoding_tree(tree->root, 0);
+
+            char* name = concat(argv[1], "-decompressed.txt");
+
+            FILE *decompressedFile = fopen(name, "wb");
+            free(name);
+
+            write_chars_to_file(decompressedFile, p, tree, totalBits);
+
+            fclose(decompressedFile);
 
             free_decoding_tree(tree->root);
             free(tree);
