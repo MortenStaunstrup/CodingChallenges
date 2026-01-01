@@ -160,6 +160,7 @@ void heapifyUp(PriorityQueue *pq, int index) {
     }
 }
 
+// GeeksForGeeks code
 void enqueue(PriorityQueue *pq, HuffmanTree node) {
     if (pq->size == nodeCount) {
         perror("queue is full");
@@ -288,6 +289,7 @@ void create_code_prefixes(HuffmanNode *node, int prefix[], int prefixLength) {
     }
 }
 
+// AI CODE!!!
 void init_create_code_prefixes(HuffmanTree tree) {
     int prefix[MAX_PREFIX_LENGTH] = {0};
     int prefixLength = 0;
@@ -302,7 +304,7 @@ char *concat(char *str1, char *str2) {
     return result;
 }
 
-
+// AI CODE!!!
 uint32_t decode_utf8_codepoint(char *p, int *len) {
     unsigned char c = (unsigned char) *p;
     uint32_t codepoint = 0;
