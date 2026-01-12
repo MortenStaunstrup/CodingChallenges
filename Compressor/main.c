@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define MAX_TABLE_SIZE 65000
 #define MAX_PREFIX_LENGTH 250
@@ -136,8 +137,8 @@ HuffmanNode *init_huffmannode_container() {
             container[index].freq = n->freq;
             container[index].kind = LEAF_NODE;
             container[index].weight = n->freq;
-            container[index].left = nullptr;
-            container[index].right = nullptr;
+            container[index].left = NULL;
+            container[index].right = NULL;
             index++;
         }
     }
@@ -243,7 +244,7 @@ HuffmanTree create_huffman_tree(PriorityQueue *pq) {
 }
 
 void print_huffman_tree(HuffmanNode *node, int depth) {
-    if (node == nullptr) return;
+    if (node == NULL) return;
     for (int i = 0; i < depth; i++) {
         printf(" ");
     }
@@ -259,7 +260,7 @@ void print_huffman_tree(HuffmanNode *node, int depth) {
 }
 
 void create_code_prefixes(HuffmanNode *node, int prefix[], int prefixLength) {
-    if (node == nullptr) return;
+    if (node == NULL) return;
 
     if (node->kind == LEAF_NODE) {
         if (prefixLength > MAX_PREFIX_LENGTH) {
@@ -440,29 +441,29 @@ DecodeTree* create_decoding_tree(DecodeBucket *bucketArray, unsigned int arrLeng
     DecodeTree* tree = malloc(sizeof(DecodeTree));
     tree->root = malloc(sizeof(DecodeNode));
     tree->root->codepoint = -1;
-    tree->root->left = nullptr;
-    tree->root->right = nullptr;
+    tree->root->left = NULL;
+    tree->root->right = NULL;
     for (int i = 0; i < arrLength; i++) {
         DecodeNode* currNode = tree->root;
         for (int j = 0; j < bucketArray[i].prefixSize; j++) {
             // Go left in the tree
             if (bucketArray[i].prefix[j] == 0) {
-                if (currNode->left == nullptr) {
+                if (currNode->left == NULL) {
                     currNode->left = malloc(sizeof(DecodeNode));
                     currNode->left->codepoint = -1;
-                    currNode->left->left = nullptr;
-                    currNode->left->right = nullptr;
+                    currNode->left->left = NULL;
+                    currNode->left->right = NULL;
                 }
                 currNode = currNode->left;
             }
 
             // Go right in the tree
             if (bucketArray[i].prefix[j] == 1) {
-                if (currNode->right == nullptr) {
+                if (currNode->right == NULL) {
                     currNode->right = malloc(sizeof(DecodeNode));
                     currNode->right->codepoint = -1;
-                    currNode->right->left = nullptr;
-                    currNode->right->right = nullptr;
+                    currNode->right->left = NULL;
+                    currNode->right->right = NULL;
                 }
                 currNode = currNode->right;
             }
@@ -478,7 +479,7 @@ DecodeTree* create_decoding_tree(DecodeBucket *bucketArray, unsigned int arrLeng
 }
 
 void print_decoding_tree(DecodeNode *node, int depth) {
-    if (node == nullptr) return;
+    if (node == NULL) return;
     for (int i = 0; i < depth; i++) {
         printf(" ");
     }
@@ -490,7 +491,7 @@ void print_decoding_tree(DecodeNode *node, int depth) {
 }
 
 void free_decoding_tree(DecodeNode* node) {
-    if (node == nullptr) {
+    if (node == NULL) {
         return;
     }
     free_decoding_tree(node->left);
