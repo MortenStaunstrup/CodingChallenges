@@ -416,6 +416,13 @@ char* remove_txt_file_extension(char *fileName) {
     return result;
 }
 
+char* remove_compressed_extension(char *filename) {
+    char* result = malloc(strlen(filename - 11));
+    strncpy(result, filename, strlen(filename) - 11);
+    result[strlen(filename) - 11] = '\0';
+    return result;
+}
+
 void help() {
     printf("Usage: <filename> compresses the file\n");
     printf("Parameters:\n");
@@ -571,10 +578,10 @@ int main(int argc, char *argv[]) {
         char* name;
         // Determine the file name
         if (argc == 4) {
-            name = argv[3];
+            name = concat(argv[3], ".compressed");
         } else {
             char *fileNameNoExtension = remove_txt_file_extension(argv[1]);
-            name = concat(fileNameNoExtension, "-compressed.txt");
+            name = concat(fileNameNoExtension, ".compressed");
             printf("%s\n", name);
             free(fileNameNoExtension);
         }
@@ -684,7 +691,8 @@ int main(int argc, char *argv[]) {
 
             print_decoding_tree(tree->root, 0);
 
-            char* name = concat(argv[1], "-decompressed.txt");
+            char *fileNameNoExtension = remove_compressed_extension(argv[1]);
+            char* name = concat(fileNameNoExtension, ".txt");
 
             FILE *decompressedFile = fopen(name, "wb");
             free(name);
