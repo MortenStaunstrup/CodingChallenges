@@ -8,7 +8,7 @@ typedef struct arrayContainer {
     int length;
 } arrayContainer;
 
-char* handle_file(char* fileArg) {
+char* handle_file(const char* fileArg) {
     FILE* file = fopen(fileArg, "r");
     if (!file) {
         printf("Error opening file!\n");
@@ -28,7 +28,27 @@ char* handle_file(char* fileArg) {
     return buffer;
 }
 
-arrayContainer doubleQuotes(char* arg, int initNumber) {
+char* handle_stdin_file() {
+    FILE* file = stdin;
+    if (!file) {
+        printf("Error opening file from stdin!\n");
+        return NULL;
+    }
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    rewind(file);
+    char* buffer = (char*)malloc(file_size + 1);
+    if (buffer == NULL) {
+        printf("Buffer could not be created");
+        return NULL;
+    }
+    fread(buffer, 1, file_size, file);
+    buffer[file_size] = '\0';
+    fclose(file);
+    return buffer;
+}
+
+arrayContainer doubleQuotes(const char* arg, const int initNumber) {
     arrayContainer container;
     int number = 0;
     int spaces = 0;
@@ -55,7 +75,7 @@ arrayContainer doubleQuotes(char* arg, int initNumber) {
     return container;
 }
 
-arrayContainer checkForF(char* arg) {
+arrayContainer checkForF(const char* arg) {
     arrayContainer container;
     int dash = 0;
     int f = 0;
@@ -83,13 +103,18 @@ arrayContainer checkForF(char* arg) {
         arg++;
     }
 
+    if (!dash || !f) {
+        container.length = -1;
+        return container;
+    }
+
     container.columns[commas] = number;
 
     container.length = commas + 1;
     return container;
 }
 
-char checkForD(char* arg) {
+char checkForD(const char* arg) {
     int dash = 0;
     int d = 0;
     char otherChar = -1;
@@ -110,17 +135,82 @@ char checkForD(char* arg) {
     return otherChar;
 }
 
-int main(int argc, char* argv[]) {
-    if (argc == 3) {
-        arrayContainer container = checkForF(argv[1]);
-        int length = container.length;
+int index_of_f(char* argv[], const int argc) {
+    for (int i = 0; i < argc; i++) {
+        arrayContainer container = checkForF(argv[i]);
+        if (container.length != -1) {
+            for (int j = 0; j < container.length; j++) {
+                if (container.columns[j] <= 0) {
+                    return -2;
+                }
+            }
+            return i;
+        }
+    }
+    return -1;
+}
 
-        if (length == -1) {
-            printf("'%s' invalid form of -f, see --help for more", argv[1]);
+int index_of_d(char* argv[], const int argc) {
+    for (int i = 0; i < argc; i++) {
+        char res = checkForD(argv[i]);
+        if (res != -1) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int check_if_stdin(char* arg) {
+    int count = 0;
+    int dash = 0;
+    while (*arg != '\0') {
+        if (*arg == '-') {
+            dash = 1;
+            count++;
+        }
+        arg++;
+    }
+    if (dash && count == 1) {
+        return 1;
+    }
+    return -1;
+}
+
+void help() {
+    printf("Use cutem to print specific fields to the terminal, from value seperated file (standard being tabs)\n\n");
+    printf("Usage: cutem -f[1..*] [optional parameter] <filename> or cutem -f[1..*] (file read from stdin)\n");
+    printf("-f\tspecifies fields to print\t usages: -f2 only field 2 -f2,5 field 2 and 5 -f\"2 6 7\" field 2,6 and 7\n");
+    printf("-d\tspecifies delimiter in file\t usages: -d, specifies , as delimiter -d! specifies ! as delimiter\n");
+}
+
+int main(const int argc, char* argv[]) {
+
+    if (argc == 1) {
+        help();
+    }
+
+    if (argc == 2) {
+        if (strcmp(argv[1], "--help") == 0) {
+            help();
             return 0;
         }
+        // Check if -f exists
+        int indx_f = index_of_f(argv, argc);
+        if (indx_f == -1) {
+            printf("Missing or invalid -f argument, see --help for help");
+            return 1;
+        } else if (indx_f == -2) {
+            printf("Can't access field of 0");
+            return 1;
+        }
 
-        char* file = handle_file(argv[2]);
+        arrayContainer container = checkForF(argv[indx_f]);
+        int length = container.length;
+
+        char* file = handle_stdin_file();
+        if (file == NULL)
+            return 1;
+
         char* p = file;
 
         int currCol = 1;
@@ -147,23 +237,130 @@ int main(int argc, char* argv[]) {
             }
             p++;
         }
+        free(file);
+    }
+
+    if (argc == 3) {
+        // Check if -f exists
+        int indx_f = index_of_f(argv, argc);
+        if (indx_f == -1) {
+            printf("Missing or invalid -f argument, see --help for help");
+            return 1;
+        } else if (indx_f == -2) {
+            printf("Can't access field of 0");
+            return 1;
+        }
+
+        arrayContainer container = checkForF(argv[indx_f]);
+        int length = container.length;
+
+        int indx_d = index_of_d(argv, argc);
+        char delimiter = -1;
+        if (indx_d != -1) {
+            delimiter = checkForD(argv[indx_d]);
+        }
+
+        char* file;
+        // If no file argument is given
+        if (indx_f == argc - 1 || indx_d == argc - 1) {
+            file = handle_stdin_file();
+        } else {
+            file = handle_file(argv[argc - 1]);
+        }
+        if (file == NULL)
+            return 1;
+
+        char* p = file;
+
+        int currCol = 1;
+
+        if (delimiter == -1) {
+            while (*p != '\0') {
+                if (*p == '\n') {
+                    currCol = 1;
+                    printf("\n");
+                } else if (*p == '\t') {
+                    currCol++;
+                } else {
+                    for (int i = 0; i < length; i++) {
+                        if (currCol == container.columns[i] && *p != '\t') {
+                            while (*p != '\t') {
+                                printf("%c", *p);
+                                p++;
+                            }
+                            if (i != length - 1) {
+                                printf("\t");
+                            }
+                            currCol++;
+                        }
+                    }
+                }
+                p++;
+            }
+        } else {
+            while (*p != '\0') {
+                if (*p == '\n') {
+                    currCol = 1;
+                    printf("\n");
+                } else if (*p == delimiter) {
+                    currCol++;
+                } else {
+                    for (int i = 0; i < length; i++) {
+                        if (currCol == container.columns[i] && *p != delimiter) {
+                            while (*p != delimiter) {
+                                printf("%c", *p);
+                                p++;
+                            }
+                            if (i != length - 1) {
+                                printf("%c", delimiter);
+                            }
+                            currCol++;
+                        }
+                    }
+                }
+                p++;
+            }
+        }
 
         free(file);
-    } else if (argc == 4) {
-        arrayContainer container = checkForF(argv[1]);
+    }
+
+    if (argc == 4) {
+        // Check if -f exists
+        int indx_f = index_of_f(argv, argc);
+        if (indx_f == -1) {
+            printf("Missing or invalid -f argument, see --help for help");
+            return 1;
+        } else if (indx_f == -2) {
+            printf("Can't access field of 0");
+            return 1;
+        }
+
+        arrayContainer container = checkForF(argv[indx_f]);
         int length = container.length;
-        if (length == -1) {
-            printf("'%s' invalid form of -f, see --help for more", argv[1]);
-            return 0;
+
+
+        int indx_d = index_of_d(argv, argc);
+        char delimiter = -1;
+        if (indx_d == -1) {
+            printf("Missing or invalid -d argument, see --help for help");
+            return 1;
+        }
+        // Check if -d exists, both must exist with 4 arguments given
+        delimiter = checkForD(argv[indx_d]);
+
+        // Check if is '-' stdin input
+        char* file;
+        int isStdin = check_if_stdin(argv[argc - 1]);
+        if (isStdin == 1) {
+            file = handle_stdin_file();
+        } else {
+            file = handle_file(argv[argc - 1]);
+        }
+        if (file == NULL) {
+            return 1;
         }
 
-        char delimiter = checkForD(argv[2]);
-        if (delimiter == -1) {
-            printf("'%s' invalid form of -d, see --help for more", argv[2]);
-            return 0;
-        }
-
-        char* file = handle_file(argv[3]);
         char* p = file;
 
         int currCol = 1;
@@ -192,6 +389,10 @@ int main(int argc, char* argv[]) {
         }
         free(file);
 
+    }
+
+    if (argc >= 5) {
+        printf("Too many arguments given, see --help for help");
     }
     return 0;
 }
