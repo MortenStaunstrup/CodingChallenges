@@ -4,12 +4,33 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-#define PORT 80
 #define BUFFER_SIZE 1024
 
 // use -lws2_32 when gcc to compiling program
 
-int main(void) {
+char *concat(const char *str1, const char *str2) {
+    char *result = malloc(strlen(str1) + strlen(str2) + 1);
+    strcpy(result, str1);
+    strcat(result, str2);
+    result[strlen(str1) + strlen(str2)] = '\0';
+    return result;
+}
+
+void convert_to_string(int number, char str[]) {
+    sprintf(str, "%d", number);
+}
+
+
+int main(int argc, char* argv[]) {
+    if (argc > 2 || argc < 2) {
+        printf("Only 1 arg needed (server number 1 or 2)\n");
+        return 1;
+    }
+    if (*argv[1] - '0' > 2 || *argv[1] - '0' < 1) {
+        printf("You can only start server number 1 or 2\n");
+        return 1;
+    }
+    int port = *argv[1] - '0' + 79;
     WSADATA wsa;
     SOCKET server_fd, new_socket;
     struct sockaddr_in address;
@@ -46,7 +67,7 @@ int main(void) {
     // Any local IP
     address.sin_addr.S_un.S_addr = INADDR_ANY;
     // Port number in network byte order
-    address.sin_port = htons(PORT);
+    address.sin_port = htons(port);
 
     // Binds the socket to the port and IP, and checks for error
     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) == SOCKET_ERROR) {
@@ -64,36 +85,58 @@ int main(void) {
         return 1;
     }
 
-    printf("Server listening on port %d\n", PORT);
+    const char* init =
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Length: 28\r\n"
+                "Content-Type: text/plain\r\n"
+                "\r\n"
+                "Hello from backend server ";
 
-    // Accepts a client connection
-    // Blocks until a client connects
-    new_socket = accept(server_fd, (struct sockaddr*)&address, &addrlen);
-    if (new_socket == INVALID_SOCKET) {
-        printf("accept failed: %d\n", WSAGetLastError());
-        closesocket(server_fd);
-        WSACleanup();
-        return 1;
-    }
+    char numbStr[20];
+    sprintf(numbStr, "%d", port);
+    char* http_response = concat(init, numbStr);
 
-    printf("Connection accepted\n");
+    printf("Server listening on port %d\n", port);
 
-    // Continuously reads from the client and prints the received data
-    // Clears buffer for next message
-    int valread;
-    while((valread = recv(new_socket, buffer, BUFFER_SIZE, 0)) > 0) {
+    while (1) {
+        // Accepts a client connection
+        new_socket = accept(server_fd, (struct sockaddr*)&address, &addrlen);
+        if (new_socket == INVALID_SOCKET) {
+            printf("accept failed: %d\n", WSAGetLastError());
+            closesocket(server_fd);
+            WSACleanup();
+            free(http_response);
+            return 1;
+        }
+
+        // Turn IPv4 address into ip address
+        char *ip = inet_ntoa(address.sin_addr);
+
+        printf("Connection accepted\n");
+        printf("Connected device ip: %s\n", ip);
+
+        int valread = recv(new_socket, buffer, BUFFER_SIZE, 0);
+        if (valread == 0) {
+            printf("Connection closed\n");
+            break;
+        }
         printf("Client: %s", buffer);
         memset(buffer, 0, BUFFER_SIZE);
-    }
 
+
+        printf("Sending message to client\n");
+        if (send(new_socket, http_response, (int)strlen(http_response), 0) == SOCKET_ERROR) {
+            printf("Message failed: %d\n", WSAGetLastError());
+            break;
+        }
+        printf("Closing socket connection to client");
+        closesocket(new_socket);
+    }
     // Closes the open sockets and clean up Winsock resources
     closesocket(new_socket);
     closesocket(server_fd);
     WSACleanup();
 
-    // Only processes one client, then terminates after disconnect
-    // Only handles one client at a time
-
+    free(http_response);
     return 0;
-
 }
