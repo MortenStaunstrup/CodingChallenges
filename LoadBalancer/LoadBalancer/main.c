@@ -5,13 +5,14 @@
 #include <windows.h>
 #include <ws2tcpip.h>
 #include <time.h>
+#include <ctype.h>
 #pragma comment(lib, "ws2_32.lib")
 
 #define LB_PORT 80
 #define MAX_PORT_AMOUNT 20
 #define BUFFER_SIZE 4096
 
-// Used AI a lot to make tbh
+// use gcc main.c -o <name> -lws2_32 to compile
 
 // Used to pass data into thread
 struct thread_data {
@@ -24,6 +25,19 @@ struct health_data {
     int backend_port;
 };
 
+enum portResult {
+    NOT_PORT_ARG,
+    NO_PORTS,
+    FORMAT_ERROR,
+    SUCCESS
+};
+
+struct port_result {
+    enum portResult result;
+    int ports[MAX_PORT_AMOUNT];
+    int amount;
+};
+
 // Globals so both threads can use them
 int healthyPorts[MAX_PORT_AMOUNT] = {0};
 int healthyPortCount = 0;
@@ -31,7 +45,7 @@ int allPorts[MAX_PORT_AMOUNT] = {0};
 int allPortCount = 0;
 HANDLE healthyMutex;
 
-int secondsToWait = 5; // default, will be set in main
+int secondsToWait = 0; // default, will be set in main
 
 SOCKET connect_to_backend(int port) {
     SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
@@ -121,10 +135,9 @@ int send_health_check(struct health_data data) {
     return -1;
 }
 
-void init_ports(int *ports, int *portCount) {
-    int currPort = 8080;
-    for (int i = 0; i < 2; i++) {
-        ports[i] = currPort++;
+void init_ports(int *ports, int *portCount, int* userPorts, int userPortCount) {
+    for (int i = 0; i < userPortCount; i++) {
+        ports[i] = userPorts[i];
         (*portCount)++;
     }
 }
@@ -202,23 +215,156 @@ DWORD WINAPI healthcheck_thread(LPVOID lpParam) {
     return 0;
 }
 
+int checkForSArg(char* argv) {
+    char resBuffer[20];
+    strncpy(resBuffer, argv, 2);
+    resBuffer[2] = '\0';
+
+    if (strcmp(resBuffer, "-s") == 0) {
+        char* p = argv + 2;
+        int seconds = 0;
+        while (*p != '\0') {
+            if (!isdigit(*p)) {
+                return -2;
+            }
+            seconds = seconds * 10 + *p - '0';
+            p++;
+        }
+        printf("Seconds to wait between health checks: %u\n", seconds);
+        return seconds;
+    }
+    return -1;
+}
+
+struct port_result checkForPArg(char* argv) {
+    char resBuffer[20];
+    strncpy(resBuffer, argv, 2);
+    resBuffer[2] = '\0';
+    struct port_result result = {0};
+    result.amount = 0;
+    result.result = NOT_PORT_ARG;
+
+    if (strcmp(resBuffer, "-p") == 0) {
+        char* p = argv + 2;
+        int currentPort = 0;
+        int isLastCharComma = 0;
+
+        while (*p != '\0') {
+            if (isdigit(*p)) {
+                isLastCharComma = 0;
+                currentPort = currentPort * 10 + (*p - '0');
+            } else if (*p == ',') {
+                isLastCharComma = 1;
+                if (currentPort == 0) {
+                    result.result = FORMAT_ERROR;
+                    printf("Missing port arg\n");
+                    return result;
+                }
+                printf("Adding port %u to ports\nContinuing...\n", currentPort);
+                result.ports[result.amount] = currentPort;
+                result.amount = result.amount + 1;
+                currentPort = 0;
+            } else {
+                printf("Unexpected character %c in -p arg\n", *p);
+                result.result = FORMAT_ERROR;
+                result.amount = 0;
+                return result;
+            }
+            p++;
+        }
+        if (isLastCharComma) {
+            printf("Expected port after comma in -p arg\n");
+            result.result = FORMAT_ERROR;
+            result.amount = 0;
+            return result;
+        }
+        if (result.amount == 0 && currentPort == 0) {
+            printf("Cannot use -p arg without specifying ports\n");
+            result.result = NO_PORTS;
+            return result;
+        }
+        if (currentPort == 0) {
+            printf("Port 0 not a valid port\n");
+            result.result = FORMAT_ERROR;
+            return result;
+        }
+        printf("Adding port %u to ports\n", currentPort);
+        result.result = SUCCESS;
+        result.ports[result.amount] = currentPort;
+        result.amount = result.amount + 1;
+    }
+    return result;
+}
+
+void help() {
+    printf("Usage: balancer.exe -p<server ports> -s<seconds>\n");
+    printf("-p usage: balancer.exe -p8080,7032 specify as many ports as needed\n");
+    printf("-s usage: balancer.exe -s200 specify seconds before loadbalancer sends health check to servers\n");
+}
 
 int main(int argc, char* argv[]) {
+    if (argc == 1) {
+        help();
+        return 0;
+    }
+    if (argc == 2 && strcmp(argv[1], "-h") == 0) {
+        help();
+        return 0;
+    }
     if (argc < 3) {
         printf("Missing args\n");
         return 1;
     }
-    if (strcmp(argv[1], "-s") != 0) {
-        printf("Missing -s time to health check arg");
-        return 1;
+
+    int* userPorts;
+    int userPortCount = 0;
+
+    printf("checking for -p arg\n");
+    for (int i = 1; i < argc; i++) {
+        struct port_result res = checkForPArg(argv[i]);
+        if (res.result == SUCCESS) {
+            userPorts = res.ports;
+            userPortCount = res.amount;
+            break;
+        }
+        if (res.result != NOT_PORT_ARG) {
+            if (res.result == FORMAT_ERROR) {
+                printf("Format error in -p arg, see -h for help\n");
+                exit(1);
+            }
+            if (res.result == NO_PORTS) {
+                printf("No ports specified in -p arg\n");
+                exit(1);
+            }
+        }
     }
+
+    if (userPortCount == 0) {
+        printf("-p arg not present\n");
+        exit(1);
+    }
+
+    printf("checking for -s arg\n");
+    for (int i = 1; i < argc; i++) {
+        int result = checkForSArg(argv[i]);
+        if (result > -1) {
+            secondsToWait = result;
+            break;
+        }
+    }
+
+    if (secondsToWait == 0) {
+        printf("-s arg not present or number <= 0\n");
+        exit(1);
+    }
+
+
     WSADATA wsa;
     SOCKET lb_sock, client;
     struct sockaddr_in lb_addr, client_addr;
     int c = 0;
-    secondsToWait = atoi(argv[2]);
 
-    init_ports(allPorts, &allPortCount);
+    init_ports(allPorts, &allPortCount, userPorts, userPortCount);
 
     // Innit WSA
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
