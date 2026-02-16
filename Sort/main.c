@@ -11,10 +11,15 @@ typedef struct node {
 #define MAX_WORDS 100000
 #define MAX_WORDS_LENGTH 100
 
+node* uniqStringTable[MAX_WORDS];
+
 static int hash(char* word) {
     int sum = 0;
     while (*word) {
         sum += (int) *word++;
+    }
+    if (sum < 0) {
+        printf("Sum is less than 0 error. Word is nothing. Should be discarded\n");
     }
     return sum % MAX_WORDS;
 }
@@ -47,45 +52,53 @@ void sort(const char* arr[], int n) {
     qsort(arr, n, sizeof(const char*), name_comparer);
 }
 
-int insert_into_table(node** table, int index, char* word) {
-    node* curr = table[index];
+void traverse_hash_table() {
+    printf("Printing nodetable words:\n");
+    for (int i = 0; i < MAX_WORDS; i++) {
+        node* curr = uniqStringTable[i];
+        while (curr != NULL) {
+            printf("%s\n", curr->word);
+            curr = curr->next;
+        }
+    }
+    printf("Done printing nodetable words\n");
+}
+
+void insert_into_new_stringtable(char** table, int non_duplicate_words) {
+    int i = 0;
+    while (i != non_duplicate_words) {
+        for (int j = 0; j < MAX_WORDS; j++) {
+            node* curr = uniqStringTable[j];
+            while (curr != NULL) {
+                table[i] = malloc(sizeof(char) * (strlen(curr->word) + 1));
+                strcpy(table[i], curr->word);
+                curr = curr->next;
+                i++;
+            }
+        }
+    }
+}
+
+int insert_into_table(char* word, int index) {
+    node* curr = uniqStringTable[index];
     while (curr != NULL) {
-        // If word already exist in the table, return prematurely
         if (strcmp(curr->word, word) == 0) {
             return 0;
         }
         curr = curr->next;
     }
-    node* newNode = malloc(sizeof(node));
-    if (newNode == NULL) {
-        printf("Memory Allocation Failed\n");
-        exit(1);
-    }
-    newNode->word = strdup(word);
-    if (newNode->word == NULL) {
-        printf("Memory Allocation Failed\n");
-        exit(1);
-    }
-    newNode->next = table[index];
-    table[index] = newNode;
+    node* newWord = malloc(sizeof(node));
+    newWord->word = malloc(strlen(word) + 1);
+    strcpy(newWord->word, word);
+    newWord->next = uniqStringTable[index];
+    uniqStringTable[index] = newWord;
     return 1;
 }
 
-void insert_into_table_array(char** arr, node** table, int non_duplicate_words) {
-    int n = 0;
-    int arrIdx = 0;
-    while (n < MAX_WORDS) {
-        node* curr = table[n];
-        while (curr != NULL) {
-            arr[arrIdx++] = curr->word;
-            curr = curr->next;
-        }
-        n++;
-    }
-    if (arrIdx != non_duplicate_words) {
-        printf("Error with inserting non_duplicate_words into new word arr\n");
-        printf("Non duplicate word: %u\n", non_duplicate_words);
-        printf("Index of last element in new array: %u\n", arrIdx);
+void traverse_unique_string_array(char** arr, int non_duplicate_words) {
+    printf("Printing unique string array:\n");
+    for (int i = 0; i < non_duplicate_words; i++) {
+        printf("%s\n", arr[i]);
     }
 }
 
@@ -116,23 +129,25 @@ int main(int argc, char* argv[]) {
         fclose(flpt);
 
         if (argc == 3 && strcmp(argv[2], "-u") == 0) {
-            node** table = calloc(MAX_WORDS , sizeof(node));
-            if (table == NULL) {
-                printf("Memory Allocation Failed\n");
-                exit(1);
+            for (int i = 0; i < MAX_WORDS; i++) {
+                uniqStringTable[i] = NULL;
             }
+
             int non_duplicate_words = 0;
             for (int i = 0; i < word_count; i++) {
                 int idx = hash(words[i]);
-                int result = insert_into_table(table, idx, words[i]);
+                if (idx < 0)
+                    continue;
+                int result = insert_into_table(words[i], idx);
                 non_duplicate_words += result;
-                printf("Result: %d\n", result);
-                free(words[i]);
             }
-            free(words);
+            traverse_hash_table();
 
-            char** tableWords = malloc(non_duplicate_words * sizeof(char*));
-            insert_into_table_array(tableWords, table, non_duplicate_words);
+            char** unique_words = malloc(non_duplicate_words * sizeof(char*));
+            insert_into_new_stringtable(unique_words, non_duplicate_words);
+
+            sort(unique_words, non_duplicate_words);
+            traverse_unique_string_array(unique_words, non_duplicate_words);
 
         } else {
             sort(words, word_count);
