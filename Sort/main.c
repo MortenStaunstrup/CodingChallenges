@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+//TODO make function to check for unkown parameters
 
 // Sorting algorithms implemented with AI
 
@@ -11,6 +14,7 @@ typedef enum sortingAlgorithm {
     RADIX_SORT,
     HEAP_SORT,
     NOT_FOUND,
+    RANDOM,
     FAIL
 } sortingAlgorithm;
 
@@ -28,6 +32,16 @@ typedef struct sortingResult {
 #define MAX_WORDS_LENGTH 100
 
 node* uniqStringTable[MAX_WORDS];
+
+node* randomSortTable[MAX_WORDS];
+
+static int random_hash(char* word, int randomNum) {
+    int sum = 0;
+    while (*word) {
+        sum += (int) *word++;
+    }
+    return sum * randomNum % MAX_WORDS;
+}
 
 static int hash(char* word) {
     int sum = 0;
@@ -120,6 +134,15 @@ void print_words(char** arr, int non_duplicate_words) {
 int find_unique_param(char* argv[], int argc){
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-u") == 0){
+            return i;
+        }
+    }
+    return -1;
+}
+
+int find_random_param(char* argv[], int argc){
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "-R") == 0){
             return i;
         }
     }
@@ -248,6 +271,40 @@ void heap_sort(char **arr, int n) {
     }
 }
 
+void print_random_sort_table() {
+    printf("Printing random table words:\n");
+    for (int i = 0; i < MAX_WORDS; i++) {
+        node* curr = randomSortTable[i];
+        while (curr != NULL) {
+            printf("%s\n", curr->word);
+            curr = curr->next;
+        }
+    }
+    printf("Done printing random table words\n");
+}
+
+void insert_into_random_table(char* word, int index) {
+    node* toInsert = (node*)malloc(sizeof(node));
+    toInsert->word = word;
+    toInsert->next = randomSortTable[index];
+    randomSortTable[index] = toInsert;
+}
+
+void random_sort(char** words, int count) {
+    int randNum = rand() % (80000 - 10000 + 1) + 10000;
+    printf("Random number is: %u\n", randNum);
+    for (int i = 0; i < MAX_WORDS; i++) {
+        randomSortTable[i] = NULL;
+    }
+    for (int i = 0; i < count; i++) {
+        int idx = random_hash(words[i], randNum);
+        if (idx < 0) {
+            continue;
+        }
+        insert_into_random_table(words[i], idx);
+    }
+}
+
 void sort(char** words, int count, sortingAlgorithm algorithm) {
     if (algorithm == NOT_FOUND || algorithm == QUICK_SORT) {
         quick_sort(words, count);
@@ -260,6 +317,9 @@ void sort(char** words, int count, sortingAlgorithm algorithm) {
     } else if (algorithm == HEAP_SORT) {
         printf("Using heapsort:\n");
         heap_sort(words, count);
+    } else if (algorithm == RANDOM) {
+        printf("Using random sort:\n");
+        random_sort(words, count);
     } else {
         printf("Algorithm not found\n");
         exit(1);
@@ -313,6 +373,8 @@ int main(int argc, char* argv[]) {
         exit(0);
     }
 
+    srand(time(NULL));
+
     if (strcmp(argv[1], "-help") == 0) {
         help();
         exit(0);
@@ -325,12 +387,18 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
+    int randomParam = find_random_param(argv, argc);
+
     int unique_param_index = find_unique_param(argv, argc);
     sortingResult sorting = find_sorting_param(argv, argc);
-    if (sorting.algorithm == FAIL) {
-        printf("Algorithm not found\n");
-        printf("Sorting options: quicksort, mergesort, radixsort, heapsort\n");
-        exit(1);
+    if (randomParam != -1) {
+        sorting.algorithm = RANDOM;
+    } else {
+        if (sorting.algorithm == FAIL) {
+            printf("Algorithm not found\n");
+            printf("Sorting options: quicksort, mergesort, radixsort, heapsort\n");
+            exit(1);
+        }
     }
 
     char** words = malloc(MAX_WORDS * sizeof(char*));
@@ -363,11 +431,19 @@ int main(int argc, char* argv[]) {
         insert_into_new_stringtable(unique_words, non_duplicate_words);
 
         sort(unique_words, non_duplicate_words, sorting.algorithm);
-        print_words(unique_words, non_duplicate_words);
+        if (randomParam == -1) {
+            print_words(unique_words, non_duplicate_words);
+        } else {
+            print_random_sort_table();
+        }
 
     } else {
         sort(words, word_count, sorting.algorithm);
-        print_words(words, word_count);
+        if (randomParam == -1) {
+            print_words(words, word_count);
+        } else {
+            print_random_sort_table();
+        }
     }
 
     return 0;
