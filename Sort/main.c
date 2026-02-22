@@ -4,8 +4,6 @@
 #include <string.h>
 #include <time.h>
 
-//TODO make function to check for unkown parameters
-
 // Sorting algorithms implemented with AI
 
 typedef enum sortingAlgorithm {
@@ -78,7 +76,7 @@ int name_comparer(const void* a, const void* b) {
     return strcmp(*(const char**)a, *(const char**)b);
 }
 
-void quick_sort(const char* arr[], int n) {
+void quick_sort(char* arr[], int n) {
     qsort(arr, n, sizeof(const char*), name_comparer);
 }
 
