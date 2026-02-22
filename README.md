@@ -46,3 +46,19 @@ Basic usage:
 
 Compression file uses Huffman encoding to compress the individual chars in a txt file so they are represented by less bits than normal.
 Creates a header to decompress later.
+
+### Loadbalancer
+
+**Use GNU compiler to compile...**
+
+**Or use the .exe in folder to test on words.txt**
+
+Basic usage:
+**.exe must be used on '\n' newline seperated textfiles**
+```
+<exe name> [optional parameters] <.txt file>
+```
+
+**-u** only prints unique words
+**-sorting** specifies sorting algorithm to use (quicksort, radixsort, heapsort, mergesort)
+**-random** uses (semi)randomized sorting (sorts by (semi)random hash key)
