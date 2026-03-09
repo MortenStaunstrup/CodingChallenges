@@ -7,6 +7,8 @@
 // TODO create a string for the 'reverse polish notation'
 // TODO create a stack datastructure for the finished RPN
 
+// Using 'Shunting yard algorithm'
+
 #define MAX_TOKENS 500
 #define MAX_DIGITS 1000
 
@@ -27,6 +29,8 @@ typedef enum result_type {
 
 typedef struct token {
     expression expressionType;
+    short precedence;
+    int rightAssociative;
     char* valueInString;
 } token;
 
@@ -43,15 +47,25 @@ typedef struct stack {
 } stack;
 
 token pop(stack* stack) {
-
+    if (stack->count == 0) {
+        printf("Stack is empty, can't pop\n");
+        exit(1);
+    }
+    token popped = stack->tokens[stack->count--];
+    return popped;
 }
 
-void push(stack* stack) {
-
+void push(stack* stack, token token) {
+    stack->tokens[stack->count++] = token;
 }
 
 token peek(stack* stack) {
+    if (stack->count == 0) {
+        printf("Empty Stack, can't peek\n");
+        exit(1);
+    }
 
+    return stack->tokens[stack->count-1];
 }
 
 char* parse_numeric(char** p) {
@@ -97,23 +111,32 @@ result tokenize_expression(char* expression) {
     while (*p != '\0') {
         token tok;
         tok.valueInString = NULL;
+        tok.precedence = -1;
+        tok.rightAssociative = 0;
 
         if (*p == '+') {
             tok.expressionType = ADDITION;
+            tok.precedence = 2;
         } else if (*p == '-') {
             tok.expressionType = SUBTRACTION;
+            tok.precedence = 2;
         } else if (*p == '*') {
             tok.expressionType = MULTIPLICATION;
+            tok.precedence = 3;
         } else if (*p == '/') {
             tok.expressionType = DIVISION;
+            tok.precedence = 3;
         } else if (*p == '(') {
             tok.expressionType = LEFT_PARENTHESIS;
+            tok.precedence = 1;
         } else if (*p == ')') {
             tok.expressionType = RIGHT_PARENTHESIS;
+            tok.precedence = 1;
         } else if (isdigit(*p)) {
             char* result = parse_numeric(&p);
             tok.expressionType = NUMBER;
             tok.valueInString = result;
+            tok.precedence = 0;
         } else {
             char* errMsh = "Unexpected token\0";
             res.error = errMsh;
@@ -125,6 +148,58 @@ result tokenize_expression(char* expression) {
     res.type = SUCCESS;
     res.error = NULL;
     return res;
+}
+
+void create_RPN(stack* operatorStack, stack* POLISHstack, token* tokens, int tokenCount) {
+    for (int i = 0; i < tokenCount; i++) {
+        int topOperatorExists = 0;
+        token topOperator;
+        if (operatorStack->count != 0) {
+            topOperator = peek(operatorStack);
+            topOperatorExists = 1;
+        }
+
+        switch (tokens[i].expressionType) {
+            case ADDITION:
+                push(operatorStack, tokens[i]);
+                break;
+            case SUBTRACTION:
+                push(operatorStack, tokens[i]);
+                break;
+            case MULTIPLICATION:
+                if (topOperatorExists && topOperator.precedence >= tokens[i].precedence) {
+                    token popedOp = pop(operatorStack);
+                    if (popedOp.expressionType != topOperator.expressionType) {
+                        printf("Error occurred popping and stuff\n");
+                        exit(1);
+                    }
+                } else {
+                    push(POLISHstack, tokens[i]);
+                }
+                break;
+            case DIVISION:
+                if (topOperatorExists && topOperator.precedence >= tokens[i].precedence) {
+                    token popedOp = pop(operatorStack);
+                    if (popedOp.expressionType != topOperator.expressionType) {
+                        printf("Error occurred popping and stuff\n");
+                        exit(1);
+                    }
+                } else {
+                    push(POLISHstack, tokens[i]);
+                }
+                break;
+            case LEFT_PARENTHESIS:
+                push(POLISHstack, tokens[i]);
+                break;
+            case RIGHT_PARENTHESIS:
+                break;
+            case NUMBER:
+                // Number always goes to output
+                push(POLISHstack, tokens[i]);
+                break;
+        }
+
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -165,5 +240,12 @@ int main(int argc, char* argv[]) {
                 break;
         }
     }
+
+    stack operatorStack;
+    operatorStack.count = 0;
+    stack POLISHstack;
+    POLISHstack.count = 0;
+
+    create_RPN(&operatorStack, &POLISHstack, res.tokens, res.tokenCount);
 
 }
