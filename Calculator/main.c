@@ -31,7 +31,7 @@ typedef struct token {
     expression expressionType;
     short precedence;
     int rightAssociative;
-    char* valueInString;
+    double numericValue;
 } token;
 
 typedef struct result {
@@ -51,7 +51,8 @@ token pop(stack* stack) {
         printf("Stack is empty, can't pop\n");
         exit(1);
     }
-    token popped = stack->tokens[stack->count--];
+    token popped = stack->tokens[stack->count-1];
+    stack->count--;
     return popped;
 }
 
@@ -68,39 +69,38 @@ token peek(stack* stack) {
     return stack->tokens[stack->count-1];
 }
 
-char* parse_numeric(char** p) {
-    if (p == NULL || *p == NULL) return NULL;
+double parse_numeric(char **p) {
 
-    long long val = 0;
     int found_digit = 0;
+    double val = 0.0;
 
-    // Parse digits
+    // Integer part
     while (isdigit(**p)) {
-        val = 10 * val + (**p - '0');
+        val = 10.0 * val + (**p - '0');
         (*p)++;
         found_digit = 1;
     }
 
-    if (!found_digit) {
-        // No digits found: return "0"
-        char* buffer = malloc(2);
-        if (buffer) {
-            buffer[0] = '0';
-            buffer[1] = '\0';
+    // Fractional part
+    if (**p == '.') {
+        (*p)++;
+        double frac = 0.0, base = 0.1;
+        while (isdigit(**p)) {
+            frac += (**p - '0') * base;
+            base /= 10.0;
+            (*p)++;
+            found_digit = 1;
         }
-        return buffer;
+        val += frac;
     }
 
-    char temp[32];
-    int len = snprintf(temp, sizeof(temp), "%lld", val);
-
-    char* buffer = malloc(len + 1); // +1 for null terminator
-    if (buffer)
-        snprintf(buffer, len + 1, "%lld", val);
+    if (!found_digit) {
+        return 0.0;
+    }
 
     (*p)--;
 
-    return buffer;
+    return val;
 }
 
 result tokenize_expression(char* expression) {
@@ -110,7 +110,7 @@ result tokenize_expression(char* expression) {
     char* p = expression;
     while (*p != '\0') {
         token tok;
-        tok.valueInString = NULL;
+        tok.numericValue = 0;
         tok.precedence = -1;
         tok.rightAssociative = 0;
 
@@ -133,9 +133,9 @@ result tokenize_expression(char* expression) {
             tok.expressionType = RIGHT_PARENTHESIS;
             tok.precedence = 1;
         } else if (isdigit(*p)) {
-            char* result = parse_numeric(&p);
+            double result = parse_numeric(&p);
             tok.expressionType = NUMBER;
-            tok.valueInString = result;
+            tok.numericValue = result;
             tok.precedence = 0;
         } else {
             char* errMsh = "Unexpected token\0";
@@ -151,72 +151,118 @@ result tokenize_expression(char* expression) {
 }
 
 void create_RPN(stack* operatorStack, stack* POLISHstack, token* tokens, int tokenCount) {
-    for (int i = 0; i < tokenCount; i++) {
-        int topOperatorExists = 0;
-        token topOperator;
-        if (operatorStack->count != 0) {
-            topOperator = peek(operatorStack);
-            topOperatorExists = 1;
+    int i = 0;
+    while (i < tokenCount) {
+        token top;
+        if (operatorStack->count > 0) {
+            top = peek(operatorStack);
         }
-
         switch (tokens[i].expressionType) {
+            case NUMBER:
+                push(POLISHstack, tokens[i]);
+                i++;
+                break;
             case ADDITION:
-                push(operatorStack, tokens[i]);
+                if (operatorStack->count > 0) {
+                    while (top.expressionType != LEFT_PARENTHESIS && (top.precedence > tokens[i].precedence ||
+                        (top.precedence == tokens[i].precedence && tokens[i].rightAssociative == 0))
+                        ) {
+                        push(POLISHstack, pop(operatorStack));
+                        if (operatorStack->count == 0) {
+                            break;
+                        }
+                        top = peek(operatorStack);
+                    }
+                    push(operatorStack, tokens[i]);
+                    i++;
+                } else {
+                    push(operatorStack, tokens[i]);
+                    i++;
+                }
                 break;
             case SUBTRACTION:
-                push(operatorStack, tokens[i]);
+                if (operatorStack->count > 0) {
+                    while (top.expressionType != LEFT_PARENTHESIS && (top.precedence > tokens[i].precedence ||
+                        (top.precedence == tokens[i].precedence && tokens[i].rightAssociative == 0))
+                        ) {
+                        push(POLISHstack, pop(operatorStack));
+                        if (operatorStack->count == 0) {
+                            break;
+                        }
+                        top = peek(operatorStack);
+                        }
+                    push(operatorStack, tokens[i]);
+                    i++;
+                } else {
+                    push(operatorStack, tokens[i]);
+                    i++;
+                }
                 break;
             case MULTIPLICATION:
-                if (topOperatorExists && topOperator.precedence >= tokens[i].precedence) {
-                    token popedOp = pop(operatorStack);
-                    if (popedOp.expressionType != topOperator.expressionType) {
-                        printf("Error occurred popping and stuff\n");
-                        exit(1);
-                    }
+                if (operatorStack->count > 0) {
+                    while (top.expressionType != LEFT_PARENTHESIS && (top.precedence > tokens[i].precedence ||
+                        (top.precedence == tokens[i].precedence && tokens[i].rightAssociative == 0))
+                        ) {
+                        push(POLISHstack, pop(operatorStack));
+                        if (operatorStack->count == 0) {
+                            break;
+                        }
+                        top = peek(operatorStack);
+                        }
+                    push(operatorStack, tokens[i]);
+                    i++;
                 } else {
-                    push(POLISHstack, tokens[i]);
+                    push(operatorStack, tokens[i]);
+                    i++;
                 }
                 break;
             case DIVISION:
-                if (topOperatorExists && topOperator.precedence >= tokens[i].precedence) {
-                    token popedOp = pop(operatorStack);
-                    if (popedOp.expressionType != topOperator.expressionType) {
-                        printf("Error occurred popping and stuff\n");
-                        exit(1);
-                    }
+                if (operatorStack->count > 0) {
+                    while (top.expressionType != LEFT_PARENTHESIS && (top.precedence > tokens[i].precedence ||
+                        (top.precedence == tokens[i].precedence && tokens[i].rightAssociative == 0))
+                        ) {
+                        push(POLISHstack, pop(operatorStack));
+                        if (operatorStack->count == 0) {
+                            break;
+                        }
+                        top = peek(operatorStack);
+                        }
+                    push(operatorStack, tokens[i]);
+                    i++;
                 } else {
-                    push(POLISHstack, tokens[i]);
+                    push(operatorStack, tokens[i]);
+                    i++;
                 }
                 break;
             case LEFT_PARENTHESIS:
-                push(POLISHstack, tokens[i]);
+                push(operatorStack, tokens[i]);
+                i++;
                 break;
             case RIGHT_PARENTHESIS:
-                break;
-            case NUMBER:
-                // Number always goes to output
-                push(POLISHstack, tokens[i]);
+                while (operatorStack->count > 0 && top.expressionType != LEFT_PARENTHESIS) {
+                    push(POLISHstack, pop(operatorStack));
+                    top = peek(operatorStack);
+                }
+                if (top.expressionType != LEFT_PARENTHESIS && operatorStack->count == 0) {
+                    printf("Missing closing parenthesis in expression\n");
+                    exit(1);
+                }
+                pop(operatorStack);
+                i++;
                 break;
         }
+    }
 
+    while (operatorStack->count > 0) {
+        push(POLISHstack, pop(operatorStack));
     }
 }
 
-int main(int argc, char* argv[]) {
-    if (argc > 2) {
-        printf("Calc expects only 1 expression (the math expression)\n");
-        exit(0);
-    }
-
-    char* expression = argv[1];
-    result res = tokenize_expression(expression);
-    if (res.type == FAILED) {
-        printf("%s\n", res.error);
-        exit(1);
-    }
-
-    for (int i = 0; i < res.tokenCount; i++) {
-        switch (res.tokens[i].expressionType) {
+void print_RPN(stack* POLISHstack) {
+    printf("Printing and popping polish stack\n");
+    while (POLISHstack->count != 0) {
+        token popedOp = pop(POLISHstack);
+        switch (popedOp.expressionType) {
             case ADDITION:
                 printf("ADDITION\n");
                 break;
@@ -236,9 +282,39 @@ int main(int argc, char* argv[]) {
                 printf("RIGHT_PARENTHESIS\n");
                 break;
             case NUMBER:
-                printf("NUMBER: %s\n", res.tokens[i].valueInString);
+                printf("NUMBER: %f\n", popedOp.numericValue);
                 break;
         }
+    }
+}
+
+stack* reverse_stack(stack* orgStack) {
+    int count = orgStack->count;
+    stack* reversedStack = malloc(sizeof(stack));
+    reversedStack->count = 0;
+
+    while (reversedStack->count != count) {
+        push(reversedStack, pop(orgStack));
+    }
+    printf("Stack reversed, count of new stack: %d\n", reversedStack->count);
+    return reversedStack;
+}
+
+void evaluate_RPN(stack* POLISHstack) {
+
+}
+
+int main(int argc, char* argv[]) {
+    if (argc > 2) {
+        printf("Calc expects only 1 expression (the math expression)\n");
+        exit(0);
+    }
+
+    char* expression = argv[1];
+    result res = tokenize_expression(expression);
+    if (res.type == FAILED) {
+        printf("%s\n", res.error);
+        exit(1);
     }
 
     stack operatorStack;
@@ -247,5 +323,10 @@ int main(int argc, char* argv[]) {
     POLISHstack.count = 0;
 
     create_RPN(&operatorStack, &POLISHstack, res.tokens, res.tokenCount);
+    stack* reversedStack = reverse_stack(&POLISHstack);
+
+    evaluate_RPN(reversedStack);
+
+    return 0;
 
 }
