@@ -115,9 +115,27 @@ result tokenize_expression(char* expression) {
         tok.rightAssociative = 0;
 
         if (*p == '+') {
+            // If is unary operator
+            if (res.tokenCount == 0 || res.tokens[res.tokenCount-1].expressionType == ADDITION
+                || res.tokens[res.tokenCount-1].expressionType == SUBTRACTION
+                || res.tokens[res.tokenCount-1].expressionType == MULTIPLICATION
+                || res.tokens[res.tokenCount-1].expressionType == DIVISION
+                || res.tokens[res.tokenCount-1].expressionType == LEFT_PARENTHESIS
+                || res.tokens[res.tokenCount-1].expressionType == RIGHT_PARENTHESIS) {
+
+            }
             tok.expressionType = ADDITION;
             tok.precedence = 2;
         } else if (*p == '-') {
+            // If is unary operator
+            if (res.tokenCount == 0 || res.tokens[res.tokenCount-1].expressionType == ADDITION
+                || res.tokens[res.tokenCount-1].expressionType == SUBTRACTION
+                || res.tokens[res.tokenCount-1].expressionType == MULTIPLICATION
+                || res.tokens[res.tokenCount-1].expressionType == DIVISION
+                || res.tokens[res.tokenCount-1].expressionType == LEFT_PARENTHESIS
+                || res.tokens[res.tokenCount-1].expressionType == RIGHT_PARENTHESIS) {
+
+                }
             tok.expressionType = SUBTRACTION;
             tok.precedence = 2;
         } else if (*p == '*') {
@@ -296,16 +314,72 @@ stack* reverse_stack(stack* orgStack) {
     while (reversedStack->count != count) {
         push(reversedStack, pop(orgStack));
     }
-    printf("Stack reversed, count of new stack: %d\n", reversedStack->count);
     return reversedStack;
 }
 
-void evaluate_RPN(stack* POLISHstack) {
-
+token applyOperator(token left, token right, token operator) {
+    token res;
+    res.precedence = 0;
+    res.expressionType = NUMBER;
+    res.rightAssociative = 0;
+    switch (operator.expressionType) {
+        case ADDITION:
+            res.numericValue = left.numericValue + right.numericValue;
+            break;
+        case SUBTRACTION:
+            res.numericValue = left.numericValue - right.numericValue;
+            break;
+        case MULTIPLICATION:
+            res.numericValue = left.numericValue * right.numericValue;
+            break;
+        case DIVISION:
+            if (right.numericValue == 0) {
+                printf("Division by zero\n");
+                exit(1);
+            }
+            res.numericValue = left.numericValue / right.numericValue;
+            break;
+        default:
+            printf("Unknown operator\n");
+            exit(1);
+    }
+    return res;
 }
 
+void evaluate_RPN(stack* POLISHstack) {
+    stack* evaluationStack = malloc(sizeof(stack));
+    evaluationStack->count = 0;
+    while (POLISHstack->count != 0) {
+        token curr = pop(POLISHstack);
+        if (evaluationStack->count < 2 && curr.expressionType != NUMBER) {
+            printf("Error handling expression evaluation: expected number but got operator\n");
+            exit(1);
+        }
+        if (curr.expressionType == NUMBER) {
+            push(evaluationStack, curr);
+        }
+        if (curr.expressionType != NUMBER) {
+            token right = pop(evaluationStack);
+            token left = pop(evaluationStack);
+            token evaluatedExpression = applyOperator(left, right, curr);
+            push(evaluationStack, evaluatedExpression);
+        }
+    }
+    // Maybe if numbers remain, expect implicit multiplication???
+    if (evaluationStack->count != 1) {
+        printf("Error handling expression evaluation: expected number remaining but got multiple\n");
+        exit(1);
+    }
+    printf("Result: %f\n", pop(evaluationStack).numericValue);
+    free(evaluationStack);
+}
+//5*(-23)
+// -18, *
+// *, -, 23, 5
+
+
 int main(int argc, char* argv[]) {
-    if (argc > 2) {
+    if (argc != 2) {
         printf("Calc expects only 1 expression (the math expression)\n");
         exit(0);
     }
@@ -326,6 +400,8 @@ int main(int argc, char* argv[]) {
     stack* reversedStack = reverse_stack(&POLISHstack);
 
     evaluate_RPN(reversedStack);
+
+    free(reversedStack);
 
     return 0;
 
