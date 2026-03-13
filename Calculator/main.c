@@ -108,6 +108,7 @@ result tokenize_expression(char* expression) {
     res.tokenCount = 0;
     res.type = FAILED;
     char* p = expression;
+    int applyUnary = 0;
     while (*p != '\0') {
         token tok;
         tok.numericValue = 0;
@@ -122,10 +123,11 @@ result tokenize_expression(char* expression) {
                 || res.tokens[res.tokenCount-1].expressionType == DIVISION
                 || res.tokens[res.tokenCount-1].expressionType == LEFT_PARENTHESIS
                 || res.tokens[res.tokenCount-1].expressionType == RIGHT_PARENTHESIS) {
-
+                applyUnary = 2;
+            } else {
+                tok.expressionType = ADDITION;
+                tok.precedence = 2;
             }
-            tok.expressionType = ADDITION;
-            tok.precedence = 2;
         } else if (*p == '-') {
             // If is unary operator
             if (res.tokenCount == 0 || res.tokens[res.tokenCount-1].expressionType == ADDITION
@@ -134,10 +136,11 @@ result tokenize_expression(char* expression) {
                 || res.tokens[res.tokenCount-1].expressionType == DIVISION
                 || res.tokens[res.tokenCount-1].expressionType == LEFT_PARENTHESIS
                 || res.tokens[res.tokenCount-1].expressionType == RIGHT_PARENTHESIS) {
-
+                    applyUnary = 1;
+                } else {
+                    tok.expressionType = SUBTRACTION;
+                    tok.precedence = 2;
                 }
-            tok.expressionType = SUBTRACTION;
-            tok.precedence = 2;
         } else if (*p == '*') {
             tok.expressionType = MULTIPLICATION;
             tok.precedence = 3;
@@ -145,6 +148,15 @@ result tokenize_expression(char* expression) {
             tok.expressionType = DIVISION;
             tok.precedence = 3;
         } else if (*p == '(') {
+            // Handle implicit multiplication
+            if (res.tokenCount > 0 && res.tokens[res.tokenCount-1].expressionType == NUMBER) {
+                token mult;
+                mult.numericValue = 0;
+                mult.precedence = 3;
+                mult.rightAssociative = 0;
+                mult.expressionType = MULTIPLICATION;
+                res.tokens[res.tokenCount++] = mult;
+            }
             tok.expressionType = LEFT_PARENTHESIS;
             tok.precedence = 1;
         } else if (*p == ')') {
@@ -152,6 +164,10 @@ result tokenize_expression(char* expression) {
             tok.precedence = 1;
         } else if (isdigit(*p)) {
             double result = parse_numeric(&p);
+            if (applyUnary == 1) {
+                result = -result;
+                applyUnary = 0;
+            }
             tok.expressionType = NUMBER;
             tok.numericValue = result;
             tok.precedence = 0;
@@ -159,6 +175,11 @@ result tokenize_expression(char* expression) {
             char* errMsh = "Unexpected token\0";
             res.error = errMsh;
             return res;
+        }
+        // If applyUnary, skip adding the '-', the number is already converted to a negative number
+        if (applyUnary > 0) {
+            p++;
+            continue;
         }
         res.tokens[res.tokenCount++] = tok;
         p++;
@@ -259,11 +280,11 @@ void create_RPN(stack* operatorStack, stack* POLISHstack, token* tokens, int tok
             case RIGHT_PARENTHESIS:
                 while (operatorStack->count > 0 && top.expressionType != LEFT_PARENTHESIS) {
                     push(POLISHstack, pop(operatorStack));
+                    if (operatorStack->count == 0) {
+                        printf("Could not find matching parenthesis\n");
+                        exit(1);
+                    }
                     top = peek(operatorStack);
-                }
-                if (top.expressionType != LEFT_PARENTHESIS && operatorStack->count == 0) {
-                    printf("Missing closing parenthesis in expression\n");
-                    exit(1);
                 }
                 pop(operatorStack);
                 i++;
@@ -365,7 +386,7 @@ void evaluate_RPN(stack* POLISHstack) {
             push(evaluationStack, evaluatedExpression);
         }
     }
-    // Maybe if numbers remain, expect implicit multiplication???
+
     if (evaluationStack->count != 1) {
         printf("Error handling expression evaluation: expected number remaining but got multiple\n");
         exit(1);
@@ -399,6 +420,7 @@ int main(int argc, char* argv[]) {
     create_RPN(&operatorStack, &POLISHstack, res.tokens, res.tokenCount);
     stack* reversedStack = reverse_stack(&POLISHstack);
 
+    //print_RPN(reversedStack);
     evaluate_RPN(reversedStack);
 
     free(reversedStack);
