@@ -104,10 +104,10 @@ Basic usage:
 ```
 
 Currently the calculator.exe works with these expressions:
-* +
-* -
-* *
-* /
-* ()
+* '+'
+* '-'
+* '*'
+* '/'
+* '()'
 
 Exponents may be added
