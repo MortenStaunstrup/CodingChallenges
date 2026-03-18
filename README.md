@@ -91,3 +91,23 @@ Optional parameters:
 **-u** only prints unique words
 **-sorting** specifies sorting algorithm to use (quicksort, radixsort, heapsort, mergesort)
 **-random** uses (semi)randomized sorting (sorts by (semi)random hash key)
+
+### Calculator
+
+**Use GNU compiler to compile...**
+
+**Or use the .exe in folder**
+
+Basic usage:
+```
+<exe name> [math expression]
+```
+
+Currently the calculator.exe works with these expressions:
+* +
+* -
+* *
+* /
+* ()
+
+Exponents may be added
