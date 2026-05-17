@@ -70,7 +70,7 @@ Can be formatted as such: -p40; -p40,80,90; OR -p"40 80 90"
 Basic usage SERVER:
 ```
 <exe name> 1
-<exi name> 2
+<exe name> 2
 ```
 Start either server 1 or 2
 Then start loadbalancer to balance requests between the two
@@ -110,4 +110,12 @@ Currently the calculator.exe works with these expressions:
 * '/'
 * '()'
 
-Exponents may be added
+Exponents may be added  
+
+For testing purposes, use the **run_tests.sh** script with Bash to run the .exe file on the **Tests.txt** file to validate output  
+
+Usage:  
+```
+./run_tests.sh ./<calculator exe name> Tests.txt
+```
+You might need to chmod the .sh file for executing priveleges  
