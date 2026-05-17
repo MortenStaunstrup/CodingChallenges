@@ -117,12 +117,8 @@ result tokenize_expression(char* expression) {
 
         if (*p == '+') {
             // If is unary operator
-            if (res.tokenCount == 0 || res.tokens[res.tokenCount-1].expressionType == ADDITION
-                || res.tokens[res.tokenCount-1].expressionType == SUBTRACTION
-                || res.tokens[res.tokenCount-1].expressionType == MULTIPLICATION
-                || res.tokens[res.tokenCount-1].expressionType == DIVISION
-                || res.tokens[res.tokenCount-1].expressionType == LEFT_PARENTHESIS
-                || res.tokens[res.tokenCount-1].expressionType == RIGHT_PARENTHESIS) {
+            if (res.tokenCount == 0 || (res.tokens[res.tokenCount-1].expressionType != NUMBER
+                && res.tokens[res.tokenCount-1].expressionType != RIGHT_PARENTHESIS)) {
                 applyUnary = 2;
             } else {
                 tok.expressionType = ADDITION;
@@ -130,12 +126,8 @@ result tokenize_expression(char* expression) {
             }
         } else if (*p == '-') {
             // If is unary operator
-            if (res.tokenCount == 0 || res.tokens[res.tokenCount-1].expressionType == ADDITION
-                || res.tokens[res.tokenCount-1].expressionType == SUBTRACTION
-                || res.tokens[res.tokenCount-1].expressionType == MULTIPLICATION
-                || res.tokens[res.tokenCount-1].expressionType == DIVISION
-                || res.tokens[res.tokenCount-1].expressionType == LEFT_PARENTHESIS
-                || res.tokens[res.tokenCount-1].expressionType == RIGHT_PARENTHESIS) {
+            if (res.tokenCount == 0 || (res.tokens[res.tokenCount-1].expressionType != NUMBER
+                && res.tokens[res.tokenCount-1].expressionType != RIGHT_PARENTHESIS)) {
                     applyUnary = 1;
                 } else {
                     tok.expressionType = SUBTRACTION;
@@ -166,8 +158,8 @@ result tokenize_expression(char* expression) {
             double result = parse_numeric(&p);
             if (applyUnary == 1) {
                 result = -result;
-                applyUnary = 0;
             }
+            applyUnary = 0;
             tok.expressionType = NUMBER;
             tok.numericValue = result;
             tok.precedence = 0;
@@ -391,12 +383,10 @@ void evaluate_RPN(stack* POLISHstack) {
         printf("Error handling expression evaluation: expected number remaining but got multiple\n");
         exit(1);
     }
-    printf("Result: %f\n", pop(evaluationStack).numericValue);
+    printf("%f\n", pop(evaluationStack).numericValue);
     free(evaluationStack);
 }
-//5*(-23)
-// -18, *
-// *, -, 23, 5
+
 
 
 int main(int argc, char* argv[]) {
