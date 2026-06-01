@@ -248,7 +248,7 @@ char* deserializeBulkStrings(char* ch) {
                 printf("parseBulkStrings: error, parsing longer string than anticipated\n");
                 exit(1);
             }
-            string[currentLength] = (char)*p;
+            string[currentLength] = (char)*ch;
             currentLength++;
             ch++;
         }
@@ -366,7 +366,7 @@ char* deserializeError(char* ch) {
             messageString = tmp2;
         }
 
-        messageString[messageLength] = (char)*p;
+        messageString[messageLength] = (char)*ch;
         messageLength++;
         ch++;
     }
