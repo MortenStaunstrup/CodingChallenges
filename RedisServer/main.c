@@ -442,13 +442,13 @@ ArrayResult deserializeArray(char* ch) {
         printf("parseArray: expected '*' starting char\n");
         exit(1);
     }
-    char* p = ch + 1;
+    ch++;
 
     int digitFound = 0;
     int arrayLength = 0;
-    while (isdigit(*p)) {
+    while (isdigit(*ch)) {
         digitFound = 1;
-        arrayLength = arrayLength * 10 + *p++ - '0';
+        arrayLength = arrayLength * 10 + *ch++ - '0';
     }
     if (!digitFound) {
         printf("parseArray: expected int telling array size\n");
@@ -456,16 +456,16 @@ ArrayResult deserializeArray(char* ch) {
     }
 
     // Parse array length denominator and first element CRLF
-    if (*p != '\r') {
+    if (*ch != '\r') {
         printf("parseInteger: expected CRLF ending in string\n");
         exit(1);
     }
-    p++;
-    if (*p != '\n') {
+    ch++;
+    if (*ch != '\n') {
         printf("parseInteger: expected CRLF ending in string\n");
         exit(1);
     }
-    p++;
+    ch++;
 
     ArrayElement* array = (ArrayElement*)malloc(sizeof(ArrayElement) * arrayLength);
 
@@ -474,7 +474,7 @@ ArrayResult deserializeArray(char* ch) {
         if (*ch == '\0') {
             printf("parseArray: unexpected end of array\n");
         }
-        TypeResponse type = ResponseType(p);
+        TypeResponse type = ResponseType(ch);
         if (!type.validType) {
             printf("parseArray: array contains non valid type\n");
             exit(1);
@@ -482,27 +482,27 @@ ArrayResult deserializeArray(char* ch) {
 
         switch (type.type) {
             case SSTRING:
-                char* sstring = deserializeSimpleString(p);
+                char* sstring = deserializeSimpleString(ch);
                 array[i].stringResponse = sstring;
                 array[i].type = SSTRING;
                 break;
             case BSTRING:
-                char* bstring = deserializeBulkStrings(p);
+                char* bstring = deserializeBulkStrings(ch);
                 array[i].stringResponse = bstring;
                 array[i].type = BSTRING;
                 break;
             case ERROR:
-                char* errorString = deserializeError(p);
+                char* errorString = deserializeError(ch);
                 array[i].stringResponse = errorString;
                 array[i].type = ERROR;
                 break;
             case INTEGER:
-                int integer = deserializeInteger(p);
+                int integer = deserializeInteger(ch);
                 array[i].intValue = integer;
                 array[i].type = INTEGER;
                 break;
             case ARRAY:
-                ArrayResult resArray = deserializeArray(p);
+                ArrayResult resArray = deserializeArray(ch);
                 array[i].array = resArray.array;
                 array[i].type = SSTRING;
                 array[i].arrayElementLength = resArray.length;
@@ -515,12 +515,12 @@ ArrayResult deserializeArray(char* ch) {
 
     if (arrayLength == 0) {
         // Parse ending CRLF
-        if (*p != '\r') {
+        if (*ch != '\r') {
             printf("parseArray: expected CRLF ending in string, when array empty\n");
             exit(1);
         }
-        p++;
-        if (*p != '\n') {
+        ch++;
+        if (*ch != '\n') {
             printf("parseArray: expected CRLF ending in string, when array empty\n");
             exit(1);
         }
@@ -533,13 +533,44 @@ ArrayResult deserializeArray(char* ch) {
 
 }
 
+void printDeserializedArrayResult(ArrayElement* array, int length) {
+    printf("[");
+    for (int i = 0; i < length; i++) {
+        switch (array[i].type) {
+            case SSTRING:
+                printf("%s", array[i].stringResponse);
+                break;
+            case BSTRING:
+                printf("%s", array[i].stringResponse);
+                break;
+            case ERROR:
+                printf("%s", array[i].stringResponse);
+                break;
+            case INTEGER:
+                printf("%d", array[i].intValue);
+                break;
+            case ARRAY:
+                printDeserializedArrayResult(array[i].array, array[i].arrayElementLength);
+                break;
+            default:
+                printf("parseArray: unexpected type\n");
+                exit(1);
+        }
+        printf(", ");
+    }
+    printf("]");
+}
 
 int main(int argc, char* argv[]) {
 
     //RunTests()
 
 
-    ArrayElement* array = deserializeArray("*2\r\n+Hello\r\n$6 World\r\n");
+    ArrayResult arrayRes = deserializeArray("*2\r\n+Hello\r\n$6 World\r\n");
+    int length = arrayRes.length;
+    ArrayElement* array = arrayRes.array;
+
+    printDeserializedArrayResult(array, length);
 
     return 0;
 }
