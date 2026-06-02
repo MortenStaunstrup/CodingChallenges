@@ -143,13 +143,13 @@ void RunDeserializationTests() {
     free(res.expectFailed);
 }
 
-char* deserializeSimpleString(char* ch) {
-    if (*ch != '+') {
+char* deserializeSimpleString(char** ch) {
+    if (**ch != '+') {
         printf("parseSimpleString: expected '+' starting char\n");
         exit(1);
     }
 
-    ch++;
+    (*ch)++;
     int length = 0;
     int capacity = 16;
     char *string = NULL;
@@ -160,7 +160,7 @@ char* deserializeSimpleString(char* ch) {
         exit(1);
     }
 
-    while (*ch != '\r' && *ch != '\n' && *ch != '\0') {
+    while (**ch != '\r' && **ch != '\n' && **ch != '\0') {
         if (length + 1 >= capacity) {
             capacity *= 2;
 
@@ -173,40 +173,40 @@ char* deserializeSimpleString(char* ch) {
             string = temp;
         }
 
-        string[length] = (char)*ch;
+        string[length] = (char)**ch;
         length++;
-        ch++;
+        (*ch)++;
     }
 
-    if (*ch != '\r') {
+    if (**ch != '\r') {
         printf("parseSimpleString: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
-    if (*ch != '\n') {
+    (*ch)++;
+    if (**ch != '\n') {
         printf("parseSimpleString: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
+    (*ch)++;
 
     string[length] = '\0';
     return string;
 }
 
-char* deserializeBulkStrings(char* ch) {
-    if (*ch != '$') {
+char* deserializeBulkStrings(char** ch) {
+    if (**ch != '$') {
         printf("parseBulkStrings: expected '$' starting char\n");
         exit(1);
     }
 
-    ch++;
+    (*ch)++;
 
     int isNull = 0;
-    if (*ch == '-') {
-        ch++;
-        if (*ch == '1') {
+    if (**ch == '-') {
+        (*ch)++;
+        if (**ch == '1') {
             isNull = 1;
-            ch++;
+            (*ch)++;
         } else {
             printf("parseBulkStrings: Invalid null string format, missing 1\n");
             exit(1);
@@ -215,24 +215,25 @@ char* deserializeBulkStrings(char* ch) {
 
     int length = 0;
     // Find length of BulkString
-    while (isdigit(*ch)) {
-        length = length * 10 + *ch++ - '0';
+    while (isdigit(**ch)) {
+        length = length * 10 + (**ch - '0');
+        (*ch)++;
     }
 
     char *string = NULL;
 
     if (!isNull) {
         // Parse CRLF after length
-        if (*ch != '\r') {
+        if (**ch != '\r') {
             printf("parseBulkStrings: parsed length, but expected \\r after\n");
             exit(1);
         }
-        ch++;
-        if (*ch != '\n') {
+        (*ch)++;
+        if (**ch != '\n') {
             printf("parseBulkStrings: parsed length and \\r, but expected \\n after\n");
             exit(1);
         }
-        ch++;
+        (*ch)++;
 
         // Parse data
 
@@ -243,14 +244,14 @@ char* deserializeBulkStrings(char* ch) {
         }
 
         int currentLength = 0;
-        while (*ch != '\r' && *ch != '\n' && *ch != '\0') {
+        while (**ch != '\r' && **ch != '\n' && **ch != '\0') {
             if (currentLength >= length) {
                 printf("parseBulkStrings: error, parsing longer string than anticipated\n");
                 exit(1);
             }
-            string[currentLength] = (char)*ch;
+            string[currentLength] = (char)**ch;
             currentLength++;
-            ch++;
+            (*ch)++;
         }
         if (currentLength != length) {
             printf("parseBulkStrings: error, parsing ended before expected length of string\n");
@@ -263,16 +264,16 @@ char* deserializeBulkStrings(char* ch) {
 
     // Parse ending CRLF
 
-    if (*ch != '\r') {
+    if (**ch != '\r') {
         printf("parseBulkStrings: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
-    if (*ch != '\n') {
+    (*ch)++;
+    if (**ch != '\n') {
         printf("parseBulkStrings: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
+    (*ch)++;
 
     return string;
 }
@@ -291,12 +292,12 @@ char* concatenate(char* string1, char* string2) {
 }
 
 
-char* deserializeError(char* ch) {
-    if (*ch != '-') {
+char* deserializeError(char** ch) {
+    if (**ch != '-') {
         printf("parseError: expected '-' starting char\n");
         exit(1);
     }
-    ch++;
+    (*ch)++;
 
     // Parse Error type
     int errorLength = 0;
@@ -309,7 +310,7 @@ char* deserializeError(char* ch) {
         exit(1);
     }
 
-    while (*ch != '\r' && *ch != '\n' && *ch != '\0' && *ch != ' ') {
+    while (**ch != '\r' && **ch != '\n' && **ch != '\0' && **ch != ' ') {
         if (errorLength + 1 >= capacity) {
             capacity *= 2;
 
@@ -322,22 +323,22 @@ char* deserializeError(char* ch) {
             errorString = temp;
         }
 
-        errorString[errorLength] = (char)*ch;
+        errorString[errorLength] = (char)**ch;
         errorLength++;
-        ch++;
+        (*ch)++;
     }
     if (errorLength == 0) {
         printf("parseError: Expected error type of length greater than 0\n");
         exit(1);
     }
-    if (*ch != ' ') {
+    if (**ch != ' ') {
         printf("parseError: Expected ' ' space between error type and error message\n");
         exit(1);
     }
     errorString[errorLength] = '\0';
 
-    ch++;
-    if (*ch == ' ') {
+    (*ch)++;
+    if (**ch == ' ') {
         printf("parseError: space between error type and error message too large\n");
         exit(1);
     }
@@ -353,7 +354,7 @@ char* deserializeError(char* ch) {
         exit(1);
     }
 
-    while (*ch != '\r' && *ch != '\n' && *ch != '\0') {
+    while (**ch != '\r' && **ch != '\n' && **ch != '\0') {
         if (messageLength + 1 >= messageCapacity) {
             messageCapacity *= 2;
 
@@ -366,9 +367,9 @@ char* deserializeError(char* ch) {
             messageString = tmp2;
         }
 
-        messageString[messageLength] = (char)*ch;
+        messageString[messageLength] = (char)**ch;
         messageLength++;
-        ch++;
+        (*ch)++;
     }
 
     if (messageLength == 0) {
@@ -378,30 +379,30 @@ char* deserializeError(char* ch) {
     messageString[messageLength] = '\0';
 
     // Parse ending CRLF
-    if (*ch != '\r') {
+    if (**ch != '\r') {
         printf("parseError: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
-    if (*ch != '\n') {
+    (*ch)++;
+    if (**ch != '\n') {
         printf("parseError: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
+    (*ch)++;
     char* result = concatenate(errorString, messageString);
     return result;
 }
 
-int deserializeInteger(char* ch) {
-    if (*ch != ':') {
+int deserializeInteger(char** ch) {
+    if (**ch != ':') {
         printf("parseInteger: expected ':' starting char\n");
         exit(1);
     }
-    ch++;
+    (*ch)++;
     int isNegative = 0;
 
-    if (*ch == '-' || *ch == '+') {
-        if (*ch == '-') {
+    if (**ch == '-' || **ch == '+') {
+        if (**ch == '-') {
             isNegative = 1;
         }
         ch++;
@@ -411,9 +412,10 @@ int deserializeInteger(char* ch) {
     // Parse integer
     int integer = 0;
     // Find length of BulkString
-    while (isdigit(*ch)) {
+    while (isdigit(**ch)) {
         parsedInteger = 1;
-        integer = integer * 10 + *ch++ - '0';
+        integer = integer * 10 + (**ch - '0');
+        (*ch)++;
     }
     if (!parsedInteger) {
         printf("parseInteger: expected integer\n");
@@ -424,31 +426,32 @@ int deserializeInteger(char* ch) {
     }
 
     // Parse ending CRLF
-    if (*ch != '\r') {
+    if (**ch != '\r') {
         printf("parseInteger: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
-    if (*ch != '\n') {
+    (*ch)++;
+    if (**ch != '\n') {
         printf("parseInteger: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
+    (*ch)++;
     return integer;
 }
 
-ArrayResult deserializeArray(char* ch) {
-    if (*ch != '*') {
+ArrayResult deserializeArray(char** ch) {
+    if (**ch != '*') {
         printf("parseArray: expected '*' starting char\n");
         exit(1);
     }
-    ch++;
+    (*ch)++;
 
     int digitFound = 0;
     int arrayLength = 0;
-    while (isdigit(*ch)) {
+    while (isdigit(**ch)) {
         digitFound = 1;
-        arrayLength = arrayLength * 10 + *ch++ - '0';
+        arrayLength = arrayLength * 10 + (**ch - '0');
+        (*ch)++;
     }
     if (!digitFound) {
         printf("parseArray: expected int telling array size\n");
@@ -456,25 +459,25 @@ ArrayResult deserializeArray(char* ch) {
     }
 
     // Parse array length denominator and first element CRLF
-    if (*ch != '\r') {
+    if (**ch != '\r') {
         printf("parseInteger: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
-    if (*ch != '\n') {
+    (*ch)++;
+    if (**ch != '\n') {
         printf("parseInteger: expected CRLF ending in string\n");
         exit(1);
     }
-    ch++;
+    (*ch)++;
 
     ArrayElement* array = (ArrayElement*)malloc(sizeof(ArrayElement) * arrayLength);
 
     // Parse datatypes
     for (int i = 0; i < arrayLength; i++) {
-        if (*ch == '\0') {
+        if (**ch == '\0') {
             printf("parseArray: unexpected end of array\n");
         }
-        TypeResponse type = ResponseType(ch);
+        TypeResponse type = ResponseType(*ch);
         if (!type.validType) {
             printf("parseArray: array contains non valid type\n");
             exit(1);
@@ -515,12 +518,12 @@ ArrayResult deserializeArray(char* ch) {
 
     if (arrayLength == 0) {
         // Parse ending CRLF
-        if (*ch != '\r') {
+        if (**ch != '\r') {
             printf("parseArray: expected CRLF ending in string, when array empty\n");
             exit(1);
         }
-        ch++;
-        if (*ch != '\n') {
+        (*ch)++;
+        if (**ch != '\n') {
             printf("parseArray: expected CRLF ending in string, when array empty\n");
             exit(1);
         }
@@ -556,7 +559,8 @@ void printDeserializedArrayResult(ArrayElement* array, int length) {
                 printf("parseArray: unexpected type\n");
                 exit(1);
         }
-        printf(", ");
+        if (i < length - 1)
+            printf(", ");
     }
     printf("]");
 }
@@ -565,8 +569,9 @@ int main(int argc, char* argv[]) {
 
     //RunTests()
 
+    char* request = "*2\r\n+Hello\r\n$6\r\n World\r\n";
 
-    ArrayResult arrayRes = deserializeArray("*2\r\n+Hello\r\n$6 World\r\n");
+    ArrayResult arrayRes = deserializeArray(&request);
     int length = arrayRes.length;
     ArrayElement* array = arrayRes.array;
 
