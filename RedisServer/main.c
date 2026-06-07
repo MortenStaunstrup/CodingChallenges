@@ -86,7 +86,7 @@ CreateParseTestResult CreateDeserializationTests() {
     expectedParsedResponses[2] = "echo hello world";
 
     tests[3] = "*2\r\n$3\r\nget\r\n$3\r\nkey\r\n";
-    expectedParsedResponses[3] = "get key";
+    expectedParsedResponses[3] = "[get, key]";
 
     tests[4] = "+OK\r\n";
     expectedParsedResponses[4] = "OK";
@@ -439,92 +439,108 @@ int deserializeInteger(char** ch) {
     return integer;
 }
 
-ArrayResult deserializeArray(char** ch) {
+ArrayResult deserializeArrayElements(char** ch) {
     if (**ch != '*') {
-        printf("parseArray: expected '*' starting char\n");
+        printf("deserializeArrayElements: expected '*' starting char\n");
         exit(1);
     }
     (*ch)++;
+
+    int isNull = 0;
+    if (**ch == '-') {
+        (*ch)++;
+        if (**ch == '1') {
+            isNull = 1;
+            (*ch)++;
+        } else {
+            printf("deserializeArrayElements: Invalid null string format, missing 1\n");
+            exit(1);
+        }
+    }
 
     int digitFound = 0;
     int arrayLength = 0;
-    while (isdigit(**ch)) {
-        digitFound = 1;
-        arrayLength = arrayLength * 10 + (**ch - '0');
-        (*ch)++;
-    }
-    if (!digitFound) {
-        printf("parseArray: expected int telling array size\n");
-        exit(1);
-    }
+    ArrayElement* array;
 
-    // Parse array length denominator and first element CRLF
-    if (**ch != '\r') {
-        printf("parseInteger: expected CRLF ending in string\n");
-        exit(1);
-    }
-    (*ch)++;
-    if (**ch != '\n') {
-        printf("parseInteger: expected CRLF ending in string\n");
-        exit(1);
-    }
-    (*ch)++;
-
-    ArrayElement* array = (ArrayElement*)malloc(sizeof(ArrayElement) * arrayLength);
-
-    // Parse datatypes
-    for (int i = 0; i < arrayLength; i++) {
-        if (**ch == '\0') {
-            printf("parseArray: unexpected end of array\n");
+    if (!isNull) {
+        while (isdigit(**ch)) {
+            digitFound = 1;
+            arrayLength = arrayLength * 10 + (**ch - '0');
+            (*ch)++;
         }
-        TypeResponse type = ResponseType(*ch);
-        if (!type.validType) {
-            printf("parseArray: array contains non valid type\n");
+        if (!digitFound) {
+            printf("deserializeArrayElements: expected int telling array size\n");
             exit(1);
         }
 
-        switch (type.type) {
-            case SSTRING:
-                char* sstring = deserializeSimpleString(ch);
-                array[i].stringResponse = sstring;
-                array[i].type = SSTRING;
-                break;
-            case BSTRING:
-                char* bstring = deserializeBulkStrings(ch);
-                array[i].stringResponse = bstring;
-                array[i].type = BSTRING;
-                break;
-            case ERROR:
-                char* errorString = deserializeError(ch);
-                array[i].stringResponse = errorString;
-                array[i].type = ERROR;
-                break;
-            case INTEGER:
-                int integer = deserializeInteger(ch);
-                array[i].intValue = integer;
-                array[i].type = INTEGER;
-                break;
-            case ARRAY:
-                ArrayResult resArray = deserializeArray(ch);
-                array[i].array = resArray.array;
-                array[i].type = SSTRING;
-                array[i].arrayElementLength = resArray.length;
-                break;
-            default:
-                printf("parseArray: unexpected type\n");
+        // Parse array length denominator and first element CRLF
+        if (**ch != '\r') {
+            printf("deserializeArrayElements: expected CRLF ending in string\n");
+            exit(1);
+        }
+        (*ch)++;
+        if (**ch != '\n') {
+            printf("deserializeArrayElements: expected CRLF ending in string\n");
+            exit(1);
+        }
+        (*ch)++;
+
+        array = (ArrayElement*)malloc(sizeof(ArrayElement) * arrayLength);
+
+        // Parse datatypes
+        for (int i = 0; i < arrayLength; i++) {
+            if (**ch == '\0') {
+                printf("deserializeArrayElements: unexpected end of array\n");
+            }
+            TypeResponse type = ResponseType(*ch);
+            if (!type.validType) {
+                printf("deserializeArrayElements: array contains non valid type\n");
                 exit(1);
+            }
+
+            switch (type.type) {
+                case SSTRING:
+                    char* sstring = deserializeSimpleString(ch);
+                    array[i].stringResponse = sstring;
+                    array[i].type = SSTRING;
+                    break;
+                case BSTRING:
+                    char* bstring = deserializeBulkStrings(ch);
+                    array[i].stringResponse = bstring;
+                    array[i].type = BSTRING;
+                    break;
+                case ERROR:
+                    char* errorString = deserializeError(ch);
+                    array[i].stringResponse = errorString;
+                    array[i].type = ERROR;
+                    break;
+                case INTEGER:
+                    int integer = deserializeInteger(ch);
+                    array[i].intValue = integer;
+                    array[i].type = INTEGER;
+                    break;
+                case ARRAY:
+                    ArrayResult resArray = deserializeArrayElements(ch);
+                    array[i].array = resArray.array;
+                    array[i].type = SSTRING;
+                    array[i].arrayElementLength = resArray.length;
+                    break;
+                default:
+                    printf("deserializeArrayElements: unexpected type\n");
+                    exit(1);
+            }
         }
     }
 
     if (arrayLength == 0) {
         // Parse ending CRLF
         if (**ch != '\r') {
-            printf("parseArray: expected CRLF ending in string, when array empty\n");
+            printf("deserializeArrayElements: expected CRLF ending in string, when array empty\n");
             exit(1);
         }
         (*ch)++;
         if (**ch != '\n') {
-            printf("parseArray: expected CRLF ending in string, when array empty\n");
+            printf("deserializeArrayElements: expected CRLF ending in string, when array empty\n");
             exit(1);
         }
     }
@@ -556,7 +572,7 @@ void printDeserializedArrayResult(ArrayElement* array, int length) {
                 printDeserializedArrayResult(array[i].array, array[i].arrayElementLength);
                 break;
             default:
-                printf("parseArray: unexpected type\n");
+                printf("printDeserializedArray: unexpected type\n");
                 exit(1);
         }
         if (i < length - 1)
@@ -565,13 +581,247 @@ void printDeserializedArrayResult(ArrayElement* array, int length) {
     printf("]");
 }
 
+char* arrayConcatenate(char* string1, char* string2) {
+    char* result = (char*)malloc(strlen(string1) + strlen(string2) + 3);
+    if (result == NULL) {
+        printf("concatenateArray: malloc failed\n");
+        exit(1);
+    }
+    strcpy(result, string1);
+    strcat(result, ", ");
+    strcat(result, string2);
+    result[strlen(result)] = '\0';
+    return result;
+}
+
+char* arrayConcatenateStart(char* string1, char* string2) {
+    char* result = (char*)malloc(strlen(string1) + strlen(string2) + 1);
+    if (result == NULL) {
+        printf("concatenateArrayStart: malloc failed\n");
+        exit(1);
+    }
+    strcpy(result, string1);
+    strcat(result, string2);
+    result[strlen(result)] = '\0';
+    return result;
+}
+
+char* arrayConcatenateEnd(char* string1, char* string2) {
+    char* result = (char*)malloc(strlen(string1) + strlen(string2) + 2);
+    if (result == NULL) {
+        printf("concatenateArrayEnd: malloc failed\n");
+        exit(1);
+    }
+    strcpy(result, string1);
+    strcat(result, string2);
+    strcat(result, "]");
+    result[strlen(result)] = '\0';
+    return result;
+}
+
+char* deserializeEmbeddedArray(ArrayElement* array, int length) {
+    if (array->type != ARRAY) {
+        printf("deserializeEmbeddedArray: expected array type to be ARRAY\n");
+        exit(1);
+    }
+    if (length == 0) {
+        return "[]";
+    }
+    int initSize = 50;
+
+    char* result = malloc(initSize*sizeof(char));
+    result[0] = '[';
+
+    // First array element concat
+
+    switch (array[1].type) {
+        case SSTRING:
+            arrayConcatenateStart(result, array[1].stringResponse);
+            break;
+        case BSTRING:
+            arrayConcatenateStart(result, array[1].stringResponse);
+            break;
+        case ERROR:
+            arrayConcatenateStart(result, array[1].stringResponse);
+            break;
+        case INTEGER:
+            char intBuffer[20];
+            sprintf(intBuffer, "%d", array[1].intValue);
+            arrayConcatenateStart(result, intBuffer);
+            break;
+        case ARRAY:
+            char* embeddedArray = deserializeEmbeddedArray(array[1].array, array[1].arrayElementLength);
+            arrayConcatenateStart(result, embeddedArray);
+            break;
+        default:
+            printf("deserializeEmbeddedArray: unexpected type\n");
+            exit(1);
+    }
+
+
+    for (int i = 1; i < length; i++) {
+        if (i == length - 1) {
+            switch (array[i].type) {
+                case SSTRING:
+                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    break;
+                case BSTRING:
+                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    break;
+                case ERROR:
+                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    break;
+                case INTEGER:
+                    char intBuffer[20];
+                    sprintf(intBuffer, "%d", array[1].intValue);
+                    arrayConcatenateEnd(result, intBuffer);
+                    break;
+                case ARRAY:
+                    char* embeddedArray = deserializeEmbeddedArray(array[i].array, array[i].arrayElementLength);
+                    arrayConcatenateEnd(result, embeddedArray);
+                    break;
+                default:
+                    printf("deserializeEmbeddedArray: unexpected type\n");
+                    exit(1);
+            }
+        } else {
+            switch (array[i].type) {
+                case SSTRING:
+                    arrayConcatenate(result, array[i].stringResponse);
+                    break;
+                case BSTRING:
+                    arrayConcatenate(result, array[i].stringResponse);
+                    break;
+                case ERROR:
+                    arrayConcatenate(result, array[i].stringResponse);
+                    break;
+                case INTEGER:
+                    char intBuffer[20];
+                    sprintf(intBuffer, "%d", array[1].intValue);
+                    arrayConcatenate(result, intBuffer);
+                    break;
+                case ARRAY:
+                    char* embeddedArray = deserializeEmbeddedArray(array[i].array, array[i].arrayElementLength);
+                    arrayConcatenate(result, embeddedArray);
+                    break;
+                default:
+                    printf("deserializeEmbeddedArray: unexpected type\n");
+                    exit(1);
+            }
+        }
+    }
+
+    return result;
+}
+
+char* deserializeArray(char** ch) {
+    if (**ch != '*') {
+        printf("deserializeArray: expected '*' to start array sequence\n");
+        exit(1);
+    }
+    int initSize = 50;
+
+    ArrayResult arrayRes = deserializeArrayElements(ch);
+    int arrayLength = arrayRes.length;
+    ArrayElement* array = arrayRes.array;
+
+    if (arrayLength == 0) {
+        return NULL;
+    }
+
+    char* result = malloc(initSize*sizeof(char));
+    result[0] = '[';
+
+    // First array element concat
+
+    switch (array[1].type) {
+        case SSTRING:
+            arrayConcatenateStart(result, array[1].stringResponse);
+            break;
+        case BSTRING:
+            arrayConcatenateStart(result, array[1].stringResponse);
+            break;
+        case ERROR:
+            arrayConcatenateStart(result, array[1].stringResponse);
+            break;
+        case INTEGER:
+            char intBuffer[20];
+            sprintf(intBuffer, "%d", array[1].intValue);
+            arrayConcatenateStart(result, intBuffer);
+            break;
+        case ARRAY:
+            char* embeddedArray = deserializeEmbeddedArray(array[1].array, array[1].arrayElementLength);
+            arrayConcatenateStart(result, embeddedArray);
+            break;
+        default:
+            printf("deserializeArray: unexpected type\n");
+            exit(1);
+    }
+
+
+    for (int i = 1; i < arrayLength; i++) {
+        if (i == arrayLength - 1) {
+            switch (array[i].type) {
+                case SSTRING:
+                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    break;
+                case BSTRING:
+                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    break;
+                case ERROR:
+                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    break;
+                case INTEGER:
+                    char intBuffer[20];
+                    sprintf(intBuffer, "%d", array[1].intValue);
+                    arrayConcatenateEnd(result, intBuffer);
+                    break;
+                case ARRAY:
+                    char* embeddedArray = deserializeEmbeddedArray(array[i].array, array[i].arrayElementLength);
+                    arrayConcatenateStart(result, embeddedArray);
+                    break;
+                default:
+                    printf("deserializeArray: unexpected type\n");
+                    exit(1);
+            }
+        } else {
+            switch (array[i].type) {
+                case SSTRING:
+                    arrayConcatenate(result, array[i].stringResponse);
+                    break;
+                case BSTRING:
+                    arrayConcatenate(result, array[i].stringResponse);
+                    break;
+                case ERROR:
+                    arrayConcatenate(result, array[i].stringResponse);
+                    break;
+                case INTEGER:
+                    char intBuffer[20];
+                    sprintf(intBuffer, "%d", array[1].intValue);
+                    arrayConcatenate(result, intBuffer);
+                    break;
+                case ARRAY:
+                    char* embeddedArray = deserializeEmbeddedArray(array[i].array, array[i].arrayElementLength);
+                    arrayConcatenate(result, embeddedArray);
+                    break;
+                default:
+                    printf("deserializeArray: unexpected type\n");
+                    exit(1);
+            }
+        }
+    }
+
+    return result;
+
+}
+
 int main(int argc, char* argv[]) {
 
     //RunTests()
 
     char* request = "*2\r\n+Hello\r\n$6\r\n World\r\n";
 
-    ArrayResult arrayRes = deserializeArray(&request);
+    ArrayResult arrayRes = deserializeArrayElements(&request);
     int length = arrayRes.length;
     ArrayElement* array = arrayRes.array;
 
