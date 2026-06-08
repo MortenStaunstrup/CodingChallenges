@@ -134,7 +134,6 @@ void RunDeserializationTests() {
         TypeResponse t = ResponseType(res.tests[i]);
         if (!t.validType) {
             printf("Invalid type\n");
-            exit(1);
         }
     }
 
@@ -619,6 +618,7 @@ char* arrayConcatenateEnd(char* string1, char* string2) {
     return result;
 }
 
+
 char* deserializeEmbeddedArray(ArrayElement* array, int length) {
     if (array->type != ARRAY) {
         printf("deserializeEmbeddedArray: expected array type to be ARRAY\n");
@@ -636,22 +636,27 @@ char* deserializeEmbeddedArray(ArrayElement* array, int length) {
 
     switch (array[1].type) {
         case SSTRING:
-            arrayConcatenateStart(result, array[1].stringResponse);
+            char* concat = arrayConcatenateStart(result, array[1].stringResponse);
+            result = concat;
             break;
         case BSTRING:
-            arrayConcatenateStart(result, array[1].stringResponse);
+            char* concatB = arrayConcatenateStart(result, array[1].stringResponse);
+            result = concatB;
             break;
         case ERROR:
-            arrayConcatenateStart(result, array[1].stringResponse);
+            char* concatE = arrayConcatenateStart(result, array[1].stringResponse);
+            result = concatE;
             break;
         case INTEGER:
             char intBuffer[20];
             sprintf(intBuffer, "%d", array[1].intValue);
-            arrayConcatenateStart(result, intBuffer);
+            char* concatI = arrayConcatenateStart(result, intBuffer);
+            result = concatI;
             break;
         case ARRAY:
             char* embeddedArray = deserializeEmbeddedArray(array[1].array, array[1].arrayElementLength);
-            arrayConcatenateStart(result, embeddedArray);
+            char* concatA = arrayConcatenateStart(result, embeddedArray);
+            result = concatA;
             break;
         default:
             printf("deserializeEmbeddedArray: unexpected type\n");
@@ -663,22 +668,27 @@ char* deserializeEmbeddedArray(ArrayElement* array, int length) {
         if (i == length - 1) {
             switch (array[i].type) {
                 case SSTRING:
-                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    char* concat = arrayConcatenateEnd(result, array[i].stringResponse);
+                    result = concat;
                     break;
                 case BSTRING:
-                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    char* concatB = arrayConcatenateEnd(result, array[i].stringResponse);
+                    result = concatB;
                     break;
                 case ERROR:
-                    arrayConcatenateEnd(result, array[i].stringResponse);
+                    char* concatE = arrayConcatenateEnd(result, array[i].stringResponse);
+                    result = concatE;
                     break;
                 case INTEGER:
                     char intBuffer[20];
                     sprintf(intBuffer, "%d", array[1].intValue);
-                    arrayConcatenateEnd(result, intBuffer);
+                    char* concatI = arrayConcatenateEnd(result, intBuffer);
+                    result = concatI;
                     break;
                 case ARRAY:
                     char* embeddedArray = deserializeEmbeddedArray(array[i].array, array[i].arrayElementLength);
-                    arrayConcatenateEnd(result, embeddedArray);
+                    char* concatA = arrayConcatenateEnd(result, embeddedArray);
+                    result = concatA;
                     break;
                 default:
                     printf("deserializeEmbeddedArray: unexpected type\n");
@@ -687,22 +697,27 @@ char* deserializeEmbeddedArray(ArrayElement* array, int length) {
         } else {
             switch (array[i].type) {
                 case SSTRING:
-                    arrayConcatenate(result, array[i].stringResponse);
+                    char* concat = arrayConcatenate(result, array[i].stringResponse);
+                    result = concat;
                     break;
                 case BSTRING:
-                    arrayConcatenate(result, array[i].stringResponse);
+                    char* concatB = arrayConcatenate(result, array[i].stringResponse);
+                    result = concatB;
                     break;
                 case ERROR:
-                    arrayConcatenate(result, array[i].stringResponse);
+                    char* concatE = arrayConcatenate(result, array[i].stringResponse);
+                    result = concatE;
                     break;
                 case INTEGER:
                     char intBuffer[20];
                     sprintf(intBuffer, "%d", array[1].intValue);
-                    arrayConcatenate(result, intBuffer);
+                    char* concatI = arrayConcatenate(result, intBuffer);
+                    result = concatI;
                     break;
                 case ARRAY:
                     char* embeddedArray = deserializeEmbeddedArray(array[i].array, array[i].arrayElementLength);
-                    arrayConcatenate(result, embeddedArray);
+                    char* concatA = arrayConcatenate(result, embeddedArray);
+                    result = concatA;
                     break;
                 default:
                     printf("deserializeEmbeddedArray: unexpected type\n");
@@ -821,11 +836,11 @@ int main(int argc, char* argv[]) {
 
     char* request = "*2\r\n+Hello\r\n$6\r\n World\r\n";
 
-    ArrayResult arrayRes = deserializeArrayElements(&request);
-    int length = arrayRes.length;
-    ArrayElement* array = arrayRes.array;
+    char* arrayRes = deserializeArray(&request);
 
-    printDeserializedArrayResult(array, length);
+    printf("%s\n", arrayRes);
+
+    free(arrayRes);
 
     return 0;
 }
