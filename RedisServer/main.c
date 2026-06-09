@@ -490,6 +490,7 @@ ArrayResult deserializeArrayElements(char** ch) {
         for (int i = 0; i < arrayLength; i++) {
             if (**ch == '\0') {
                 printf("deserializeArrayElements: unexpected end of array\n");
+                exit(1);
             }
             TypeResponse type = ResponseType(*ch);
             if (!type.validType) {
@@ -531,18 +532,6 @@ ArrayResult deserializeArrayElements(char** ch) {
         }
     }
 
-    if (arrayLength == 0) {
-        // Parse ending CRLF
-        if (**ch != '\r') {
-            printf("deserializeArrayElements: expected CRLF ending in string, when array empty\n");
-            exit(1);
-        }
-        (*ch)++;
-        if (**ch != '\n') {
-            printf("deserializeArrayElements: expected CRLF ending in string, when array empty\n");
-            exit(1);
-        }
-    }
 
     ArrayResult result;
     result.array = array;
@@ -682,14 +671,52 @@ char* arrayConcatenateEnd(char* string1, char* string2, int isString) {
 }
 
 char* arrayConcatenateOneElement(char* string1, char* string2, int isString) {
-    // TODO implement
+    char* st2;
+    char* result;
+    int isNull = 0;
+    if (string2 == NULL) {
+        st2 = "nil";
+        isNull = 1;
+        result = malloc(strlen(string1) + strlen(st2) + 3);
+    } else {
+        if (isString) {
+            result = malloc(strlen(string1) + strlen(string2) + 5);
+        } else {
+            result = malloc(strlen(string1) + strlen(string2) + 3);
+        }
+        st2 = string2;
+    }
+    if (result == NULL) {
+        printf("concatenateArrayOneElement: malloc failed\n");
+        exit(1);
+    }
+
+    strcpy(result, "[");
+    if (isString && !isNull) {
+        strcat(result, "\"");
+        strcat(result, st2);
+        strcat(result, "\"");
+    } else {
+        strcat(result, st2);
+    }
+    strcat(result, "]");
+    result[strlen(result)] = '\0';
+    return result;
 }
 
 char* deserializeEmbeddedArray(ArrayElement* array, int length);
 
-char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, int isStart, int isEnd) {
+char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, int isStart, int isEnd, int hasOneElement) {
     if (isStart && isEnd) {
         printf("ArrayResponseConcatenator called with both arrayStart and arrayEnd flags");
+        exit(1);
+    }
+    if (isEnd && hasOneElement) {
+        printf("ArrayResponseConcatenator called with both arrayEnd and hasOneElement flag");
+        exit(1);
+    }
+    if (isStart && hasOneElement) {
+        printf("ArrayResponseConcatenator called with both arrayStart and hasOneElement flag");
         exit(1);
     }
 
@@ -724,12 +751,39 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
                 result = concatA;
                 break;
             default:
-                printf("deserializeEmbeddedArray: unexpected type\n");
+                printf("arrayResponseConcatenator: unexpected type\n");
                 exit(1);
         }
-    }
-
-    if (isEnd) {
+    } else if (hasOneElement) {
+        switch (array[0].type) {
+            case SSTRING:
+                char* concat = arrayConcatenateOneElement(result, array[0].stringResponse, 1);
+                result = concat;
+                break;
+            case BSTRING:
+                char* concatB = arrayConcatenateOneElement(result, array[0].stringResponse, 1);
+                result = concatB;
+                break;
+            case ERROR:
+                char* concatE = arrayConcatenateOneElement(result, array[0].stringResponse, 0);
+                result = concatE;
+                break;
+            case INTEGER:
+                char intBuffer[20];
+                sprintf(intBuffer, "%d", array[0].intValue);
+                char* concatI = arrayConcatenateOneElement(result, intBuffer, 0);
+                result = concatI;
+                break;
+            case ARRAY:
+                char* embeddedArray = deserializeEmbeddedArray(array[0].array, array[0].arrayElementLength);
+                char* concatA = arrayConcatenateOneElement(result, embeddedArray, 0);
+                result = concatA;
+                break;
+            default:
+                printf("arrayResponseConcatenator: unexpected type\n");
+                exit(1);
+        }
+    } else if (isEnd) {
         switch (array[index].type) {
             case SSTRING:
                 char* concat = arrayConcatenateEnd(result, array[index].stringResponse, 1);
@@ -760,7 +814,7 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
         }
     }
 
-    if (!isEnd && !isStart) {
+    if (!isEnd && !isStart && !hasOneElement) {
         switch (array[index].type) {
             case SSTRING:
                 char* concat = arrayConcatenate(result, array[index].stringResponse, 1);
@@ -796,7 +850,10 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
 
 char* deserializeEmbeddedArray(ArrayElement* array, int length) {
     if (length == 0) {
-        return "[]";
+        char* emptyArray = malloc(2*sizeof(char) + 1);
+        strcpy(emptyArray, "[]");
+        emptyArray[2] = '\0';
+        return emptyArray;
     }
     int initSize = 50;
 
@@ -804,14 +861,18 @@ char* deserializeEmbeddedArray(ArrayElement* array, int length) {
 
     // First array element concat
 
-    result = arrayResponseConcatenator(result, array, 0, 1, 0);
+    if (length == 1) {
+        result = arrayResponseConcatenator(result, array, 0, 0, 0, 1);
+    } else {
+        result = arrayResponseConcatenator(result, array, 0, 1, 0, 0);
+    }
 
 
     for (int i = 1; i < length; i++) {
         if (i == length - 1) {
-            result = arrayResponseConcatenator(result, array, i, 0, 1);
+            result = arrayResponseConcatenator(result, array, i, 0, 1, 0);
         } else {
-            result = arrayResponseConcatenator(result, array, i, 0, 0);
+            result = arrayResponseConcatenator(result, array, i, 0, 0, 0);
         }
     }
 
@@ -832,24 +893,27 @@ char* deserializeArray(char** ch) {
     ArrayElement* array = arrayRes.array;
 
     if (arrayLength == 0) {
-        return NULL;
+        char* emptyArray = malloc(2*sizeof(char) + 1);
+        strcpy(emptyArray, "[]");
+        emptyArray[2] = '\0';
+        return emptyArray;
     }
 
     char* result = malloc(initSize*sizeof(char));
 
     // First array element concat
     if (arrayLength == 1) {
-
+        result = arrayResponseConcatenator(result, array, 0, 0, 0, 1);
     } else {
-        result = arrayResponseConcatenator(result, array, 0, 1, 0);
+        result = arrayResponseConcatenator(result, array, 0, 1, 0, 0);
     }
 
 
     for (int i = 1; i < arrayLength; i++) {
         if (i == arrayLength - 1) {
-            result = arrayResponseConcatenator(result, array, i, 0, 1);
+            result = arrayResponseConcatenator(result, array, i, 0, 1, 0);
         } else {
-            result = arrayResponseConcatenator(result, array, i, 0, 0);
+            result = arrayResponseConcatenator(result, array, i, 0, 0, 0);
         }
     }
 
@@ -863,8 +927,7 @@ int main(int argc, char* argv[]) {
 
     //char* request = "*0\r\n$5\r\nhello\r\n$-1\r\n$5\r\nworld\r\n";
 
-    // TODO Does not work as intended
-    char* request = "*0\r\n";
+    char* request = "*1\r\n*1\r\n*1\r\n";
     char* arrayRes = deserializeArray(&request);
 
     printf("%s\n", arrayRes);
