@@ -2,26 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "Tests.h"
 
-typedef enum Type {
-    SSTRING,
-    ERROR,
-    INTEGER,
-    BSTRING,
-    ARRAY
-} Type;
-
-typedef struct TypeResponse {
-    int validType;
-    Type type;
-} TypeResponse;
-
-typedef struct CreateDeserializationTests {
-    int amountOfTests;
-    char** tests;
-    char** expected;
-    int* expectFailed;
-} CreateParseTestResult;
 
 typedef struct ArrayElement {
     Type type;
@@ -37,110 +19,6 @@ typedef struct ArrayResult {
     int length;
     ArrayElement* array;
 } ArrayResult;
-
-TypeResponse ResponseType(char* ch) {
-    TypeResponse t;
-    t.validType = 1;
-    switch (*ch) {
-        case '+':
-            t.type = SSTRING;
-            break;
-        case '-':
-            t.type = ERROR;
-            break;
-        case ':':
-            t.type = INTEGER;
-            break;
-        case '$':
-            t.type = BSTRING;
-            break;
-        case '*':
-            t.type = ARRAY;
-            break;
-        default:
-            t.type = ERROR;
-            t.validType = 0;
-    }
-
-    return t;
-
-}
-
-CreateParseTestResult CreateDeserializationTests() {
-    CreateParseTestResult res;
-    res.amountOfTests = 13;
-    char** tests;
-    char** expectedParsedResponses;
-    int* expectedFailedResponse;
-    tests = (char**)malloc(res.amountOfTests * sizeof(char*));
-    expectedParsedResponses = (char**)malloc(res.amountOfTests * sizeof(char*));
-    expectedFailedResponse = (int*)malloc(res.amountOfTests * sizeof(int));
-
-    tests[0] = "$-1\r\n";
-    expectedParsedResponses[0] = NULL;
-
-    tests[1] = "*1\r\n$4\r\nping\r\n";
-    expectedParsedResponses[1] = "ping";
-
-    tests[2] = "*2\r\n$4\r\necho\r\n$11\r\nhello world\r\n";
-    expectedParsedResponses[2] = "echo hello world";
-
-    tests[3] = "*2\r\n$3\r\nget\r\n$3\r\nkey\r\n";
-    expectedParsedResponses[3] = "[get, key]";
-
-    tests[4] = "+OK\r\n";
-    expectedParsedResponses[4] = "OK";
-
-    tests[5] = "-Error message\r\n";
-    expectedParsedResponses[5] = "Error message";
-
-    tests[6] = "$0\r\n\r\n";
-    expectedParsedResponses[6] = "";
-
-    tests[7] = "+hello world\r\n";
-    expectedParsedResponses[7] = "hello world";
-
-    tests[8] = "$0\r\r\n";
-    expectedParsedResponses[8] = NULL;
-    expectedFailedResponse[8] = 1;
-
-    tests[9] = "$-1";
-    expectedParsedResponses[9] = NULL;
-    expectedFailedResponse[9] = 1;
-
-    tests[10] = "sfdgsfdg4e6346346";
-    expectedParsedResponses[10] = NULL;
-    expectedFailedResponse[10] = 1;
-
-    tests[11] = "+Whatup\r\n";
-    expectedParsedResponses[11] = "Whatup";
-
-    tests[12] = "-Error\r\n";
-    expectedParsedResponses[12] = NULL;
-    expectedFailedResponse[12] = 1;
-
-    res.tests = tests;
-    res.expected = expectedParsedResponses;
-    res.expectFailed = expectedFailedResponse;
-    return res;
-}
-
-void RunDeserializationTests() {
-
-    CreateParseTestResult res = CreateDeserializationTests();
-
-    for (int i = 0; i < res.amountOfTests; i++) {
-        printf("Test case: %s\nExpected: %s\n", res.tests[i], res.expected[i]);
-        TypeResponse t = ResponseType(res.tests[i]);
-        if (!t.validType) {
-            printf("Invalid type\n");
-        }
-    }
-
-    free(res.tests);
-    free(res.expected);
-    free(res.expectFailed);
-}
 
 char* deserializeSimpleString(char** ch) {
     if (**ch != '+') {
@@ -540,6 +418,7 @@ ArrayResult deserializeArrayElements(char** ch) {
 
 }
 
+/*
 void printDeserializedArrayResult(ArrayElement* array, int length) {
     printf("[");
     for (int i = 0; i < length; i++) {
@@ -568,7 +447,7 @@ void printDeserializedArrayResult(ArrayElement* array, int length) {
     }
     printf("]");
 }
-
+*/
 char* arrayConcatenate(char* string1, char* string2, int isString) {
     char* st2;
     char* result;
@@ -921,14 +800,42 @@ char* deserializeArray(char** ch) {
 
 }
 
+char* deserializeRequest(char** ch) {
+    switch (**ch) {
+        case '*':
+            return deserializeArray(ch);
+            break;
+        case '+':
+            return deserializeSimpleString(ch);
+            break;
+        case '-':
+            return deserializeError(ch);
+            break;
+        case '$':
+            return deserializeBulkStrings(ch);
+            break;
+        case ':':
+            int res = deserializeInteger(ch);
+            int length = snprintf(NULL, 0, "%d", res);
+            char* stringVersion = malloc(length + 1);
+            sprintf(stringVersion, "%d", res);
+            if (stringVersion == NULL) {
+                printf("deserializeRequest: error malloc deserializeInteger\n");
+                exit(1);
+            }
+            return stringVersion;
+            break;
+        default:
+            return NULL;
+            break;
+    }
+}
+
 int main(int argc, char* argv[]) {
 
-    //RunTests()
 
-    //char* request = "*0\r\n$5\r\nhello\r\n$-1\r\n$5\r\nworld\r\n";
-
-    char* request = "*1\r\n*1\r\n*1\r\n";
-    char* arrayRes = deserializeArray(&request);
+    char* request = "*1\r\n*1\r\n*0\r\n";
+    char* arrayRes = deserializeRequest(&request);
 
     printf("%s\n", arrayRes);
 
