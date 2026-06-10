@@ -37,17 +37,17 @@ typedef struct {
     Result result;
 } DeserializationResult;
 
-DeserializationResult deserializeSimpleString(char** ch);
+char* deserializeSimpleString(char** ch);
 
-DeserializationResult deserializeBulkStrings(char** ch);
+char* deserializeBulkStrings(char** ch);
 
 char* concatenate(char* string1, char* string2);
 
-DeserializationResult deserializeError(char** ch);
+char* deserializeError(char** ch);
 
-DeserializationResult deserializeInteger(char** ch);
+int deserializeInteger(char** ch);
 
-DeserializationResult deserializeArrayElements(char** ch);
+ArrayResult deserializeArrayElements(char** ch);
 
 char* arrayConcatenate(char* string1, char* string2, int isString);
 
@@ -59,10 +59,10 @@ char* arrayConcatenateOneElement(char* string1, char* string2, int isString);
 
 char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, int isStart, int isEnd, int hasOneElement);
 
-DeserializationResult deserializeEmbeddedArray(ArrayElement* array, int length);
+char* deserializeEmbeddedArray(ArrayElement* array, int length);
 
-DeserializationResult deserializeArray(char** ch);
+char* deserializeArray(char** ch);
 
-DeserializationResult deserializeRequest(char** ch);
+char* deserializeRequest(char** ch);
 
 #endif //REDISSERVER_DESERIALIZATION_H

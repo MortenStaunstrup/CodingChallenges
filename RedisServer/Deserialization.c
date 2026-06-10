@@ -8,7 +8,7 @@
 #include <string.h>
 #include "Deserialization.h"
 
-DeserializationResult deserializeSimpleString(char** ch) {
+char* deserializeSimpleString(char** ch) {
     if (**ch != '+') {
         printf("deserializeSimpleString: expected '+' starting char\n");
         exit(1);
@@ -58,7 +58,7 @@ DeserializationResult deserializeSimpleString(char** ch) {
     return string;
 }
 
-DeserializationResult deserializeBulkStrings(char** ch) {
+char* deserializeBulkStrings(char** ch) {
     if (**ch != '$') {
         printf("deserializeBulkStrings: expected '$' starting char\n");
         exit(1);
@@ -157,7 +157,7 @@ char* concatenate(char* string1, char* string2) {
 }
 
 
-DeserializationResult deserializeError(char** ch) {
+char* deserializeError(char** ch) {
     if (**ch != '-') {
         printf("deserializeError: expected '-' starting char\n");
         exit(1);
@@ -258,7 +258,7 @@ DeserializationResult deserializeError(char** ch) {
     return result;
 }
 
-DeserializationResult deserializeInteger(char** ch) {
+int deserializeInteger(char** ch) {
     if (**ch != ':') {
         printf("deserializeInteger: expected ':' starting char\n");
         exit(1);
@@ -304,7 +304,7 @@ DeserializationResult deserializeInteger(char** ch) {
     return integer;
 }
 
-DeserializationResult deserializeArrayElements(char** ch) {
+ArrayResult deserializeArrayElements(char** ch) {
     if (**ch != '*') {
         printf("deserializeArrayElements: expected '*' starting char\n");
         exit(1);
@@ -714,7 +714,7 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
     return result;
 }
 
-DeserializationResult deserializeEmbeddedArray(ArrayElement* array, int length) {
+char* deserializeEmbeddedArray(ArrayElement* array, int length) {
     if (length == 0) {
         char* emptyArray = malloc(2*sizeof(char) + 1);
         strcpy(emptyArray, "[]");
@@ -747,7 +747,7 @@ DeserializationResult deserializeEmbeddedArray(ArrayElement* array, int length) 
 
 // TODO Need logic for reallocation if init size in deserialize array functions gets exceeded.
 
-DeserializationResult deserializeArray(char** ch) {
+char* deserializeArray(char** ch) {
     if (**ch != '*') {
         printf("deserializeArray: expected '*' to start array sequence\n");
         exit(1);
@@ -787,7 +787,7 @@ DeserializationResult deserializeArray(char** ch) {
 
 }
 
-DeserializationResult deserializeRequest(char** ch) {
+char* deserializeRequest(char** ch) {
     switch (**ch) {
         case '*':
             return deserializeArray(ch);
