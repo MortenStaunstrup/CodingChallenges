@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include "Tests.h"
 
+#include <string.h>
+
+#include "Deserialization.h"
+
 
 void RunDeserializationTests() {
 
@@ -9,6 +13,20 @@ void RunDeserializationTests() {
 
     for (int i = 0; i < res.amountOfTests; i++) {
         TypeResponse t = ResponseType(res.tests[i]);
+        char* result = deserializeRequest(&res.tests[i]);
+        if (result == NULL) {
+            if (res.expected[i] == NULL) {
+                printf("Test: %d PASSED\n", i);
+            } else {
+                printf("Test: %d FAILED\n", i);
+                printf("Result is null, but expected: %s\n", res.expected[i]);
+            }
+        } else if (strcmp(result, res.expected[i]) == 0) {
+            printf("Test: %d PASSED\n", i);
+        } else {
+            printf("Test: %d FAILED\n", i);
+            printf("Result: %s\nExpected: %s\n", result, res.expected[i]);
+        }
         if (!t.validType) {
             printf("Invalid type\n");
         }
@@ -61,13 +79,13 @@ CreateDeserializationTests CreateDeserializationTestsFunction() {
     expectedParsedResponses[0] = NULL;
 
     tests[1] = "*1\r\n$4\r\nping\r\n";
-    expectedParsedResponses[1] = "ping";
+    expectedParsedResponses[1] = "[\"ping\"]";
 
     tests[2] = "*2\r\n$4\r\necho\r\n$11\r\nhello world\r\n";
-    expectedParsedResponses[2] = "echo hello world";
+    expectedParsedResponses[2] = "[\"echo\", \"hello world\"]";
 
     tests[3] = "*2\r\n$3\r\nget\r\n$3\r\nkey\r\n";
-    expectedParsedResponses[3] = "[get, key]";
+    expectedParsedResponses[3] = "[\"get\", \"key\"]";
 
     tests[4] = "+OK\r\n";
     expectedParsedResponses[4] = "OK";
@@ -99,6 +117,12 @@ CreateDeserializationTests CreateDeserializationTestsFunction() {
     tests[12] = "-Error\r\n";
     expectedParsedResponses[12] = NULL;
     expectedFailedResponse[12] = 1;
+
+    tests[13] = "$9\r\nHey\r\nMy G\r\n";
+    expectedParsedResponses[13] = "Hey\r\nMy G";
+
+    tests[14] = "$21\r\nHello my name is Carl";
+    expectedParsedResponses[14] = "Hello my name is Carl";
 
     res.tests = tests;
     res.expected = expectedParsedResponses;
