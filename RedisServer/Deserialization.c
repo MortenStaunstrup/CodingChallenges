@@ -8,7 +8,8 @@
 #include <string.h>
 #include "Deserialization.h"
 
-char* deserializeSimpleString(char** ch) {
+DeserializationResult deserializeSimpleString(char** ch) {
+    DeserializationResult result = {0};
     if (**ch != '+') {
         printf("deserializeSimpleString: expected '+' starting char\n");
         exit(1);
@@ -33,7 +34,7 @@ char* deserializeSimpleString(char** ch) {
             if (temp == NULL) {
                 free(string);
                 printf("deserializeSimpleString: realloc failed\n");
-                return NULL;
+                exit(1);
             }
             string = temp;
         }
@@ -44,21 +45,30 @@ char* deserializeSimpleString(char** ch) {
     }
 
     if (**ch != '\r') {
-        printf("deserializeSimpleString: expected CRLF ending in string\n");
-        exit(1);
+        char* errorString = "deserializeSimpleString: expected CRLF ending in string";
+        printf("%s\n", errorString);
+        result.errorMessage = errorString;
+        result.result = FAILED;
+        return result;
     }
     (*ch)++;
     if (**ch != '\n') {
-        printf("deserializeSimpleString: expected CRLF ending in string\n");
-        exit(1);
+        char* errorString = "deserializeSimpleString: expected CRLF ending in string";
+        printf("%s\n", errorString);
+        result.errorMessage = errorString;
+        result.result = FAILED;
+        return result;
     }
     (*ch)++;
 
     string[length] = '\0';
-    return string;
+    result.result = SUCCESS;
+    result.content = string;
+    return result;
 }
 
-char* deserializeBulkStrings(char** ch) {
+DeserializationResult deserializeBulkStrings(char** ch) {
+    DeserializationResult result = {0};
     if (**ch != '$') {
         printf("deserializeBulkStrings: expected '$' starting char\n");
         exit(1);
@@ -73,8 +83,11 @@ char* deserializeBulkStrings(char** ch) {
             isNull = 1;
             (*ch)++;
         } else {
-            printf("deserializeBulkStrings: Invalid null string format, missing 1\n");
-            exit(1);
+            char* errorString = "deserializeBulkStrings: Invalid null string format, missing 1";
+            printf("%s\n", errorString);
+            result.errorMessage = errorString;
+            result.result = FAILED;
+            return result;
         }
     }
 
@@ -90,13 +103,19 @@ char* deserializeBulkStrings(char** ch) {
     if (!isNull) {
         // Parse CRLF after length
         if (**ch != '\r') {
-            printf("deserializeBulkStrings: parsed length, but expected \\r after\n");
-            exit(1);
+            char* errorString = "deserializeBulkStrings: parsed length, but expected \\r after";
+            printf("%s\n", errorString);
+            result.errorMessage = errorString;
+            result.result = FAILED;
+            return result;
         }
         (*ch)++;
         if (**ch != '\n') {
-            printf("deserializeBulkStrings: parsed length and \\r, but expected \\n after\n");
-            exit(1);
+            char* errorString = "deserializeBulkStrings: parsed length, but expected \\r after";
+            printf("%s\n", errorString);
+            result.errorMessage = errorString;
+            result.result = FAILED;
+            return result;
         }
         (*ch)++;
 
@@ -109,20 +128,18 @@ char* deserializeBulkStrings(char** ch) {
         }
 
         int currentLength = 0;
-        while (**ch != '\r' && **ch != '\n' && **ch != '\0') {
-            if (currentLength >= length) {
-                printf("deserializeBulkStrings: error, parsing longer string than anticipated\n");
-                exit(1);
-            }
+        while (**ch != '\0' && currentLength < length) {
             string[currentLength] = (char)**ch;
             currentLength++;
             (*ch)++;
         }
         if (currentLength != length) {
-            printf("deserializeBulkStrings: error, parsing ended before expected length of string\n");
-            exit(1);
+            char* errorString = "deserializeBulkStrings: error, parsing ended before expected length of string";
+            printf("%s\n", errorString);
+            result.errorMessage = errorString;
+            result.result = FAILED;
+            return result;
         }
-
         string[length] = '\0';
     }
 
@@ -130,17 +147,25 @@ char* deserializeBulkStrings(char** ch) {
     // Parse ending CRLF
 
     if (**ch != '\r') {
-        printf("deserializeBulkStrings: expected CRLF ending in string\n");
-        exit(1);
+        char* errorString = "deserializeBulkStrings: expected CRLF ending in string";
+        printf("%s\n", errorString);
+        result.errorMessage = errorString;
+        result.result = FAILED;
+        return result;
     }
     (*ch)++;
     if (**ch != '\n') {
-        printf("deserializeBulkStrings: expected CRLF ending in string\n");
-        exit(1);
+        char* errorString = "deserializeBulkStrings: expected CRLF ending in string";
+        printf("%s\n", errorString);
+        result.errorMessage = errorString;
+        result.result = FAILED;
+        return result;
     }
     (*ch)++;
 
-    return string;
+    result.result = SUCCESS;
+    result.content = string;
+    return result;
 }
 
 char* concatenate(char* string1, char* string2) {
@@ -157,7 +182,8 @@ char* concatenate(char* string1, char* string2) {
 }
 
 
-char* deserializeError(char** ch) {
+DeserializationResult deserializeError(char** ch) {
+    DeserializationResult result = {0};
     if (**ch != '-') {
         printf("deserializeError: expected '-' starting char\n");
         exit(1);
@@ -183,7 +209,7 @@ char* deserializeError(char** ch) {
             if (temp == NULL) {
                 free(errorString);
                 printf("deserializeError: realloc failed\n");
-                return NULL;
+                exit(1);
             }
             errorString = temp;
         }
@@ -193,19 +219,28 @@ char* deserializeError(char** ch) {
         (*ch)++;
     }
     if (errorLength == 0) {
-        printf("deserializeError: Expected error type of length greater than 0\n");
-        exit(1);
+        char* errorStringMessage = "deserializeError: Expected error type of length greater than 0";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
     if (**ch != ' ') {
-        printf("deserializeError: Expected ' ' space between error type and error message\n");
-        exit(1);
+        char* errorStringMessage = "deserializeError: Expected ' ' space between error type and error message";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
     errorString[errorLength] = '\0';
 
     (*ch)++;
     if (**ch == ' ') {
-        printf("deserializeError: space between error type and error message too large\n");
-        exit(1);
+        char* errorStringMessage = "deserializeError: space between error type and error message too large";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
 
     // Parse error message
@@ -227,7 +262,7 @@ char* deserializeError(char** ch) {
             if (tmp2 == NULL) {
                 free(messageString);
                 printf("deserializeError: realloc failed\n");
-                return NULL;
+                exit(1);
             }
             messageString = tmp2;
         }
@@ -238,27 +273,39 @@ char* deserializeError(char** ch) {
     }
 
     if (messageLength == 0) {
-        printf("deserializeError: Expected error message length greater than 0\n");
-        exit(1);
+        char* errorStringMessage = "deserializeError: Expected error message length greater than 0";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
     messageString[messageLength] = '\0';
 
     // Parse ending CRLF
     if (**ch != '\r') {
-        printf("deserializeError: expected CRLF ending in string\n");
-        exit(1);
+        char* errorStringMessage = "deserializeError: expected CRLF ending in string";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
     (*ch)++;
     if (**ch != '\n') {
-        printf("deserializeError: expected CRLF ending in string\n");
-        exit(1);
+        char* errorStringMessage = "deserializeError: expected CRLF ending in string";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
     (*ch)++;
-    char* result = concatenate(errorString, messageString);
+
+    result.result = SUCCESS;
+    result.content = concatenate(errorString, messageString);
     return result;
 }
 
-int deserializeInteger(char** ch) {
+DeserializationResult deserializeInteger(char** ch) {
+    DeserializationResult result = {0};
     if (**ch != ':') {
         printf("deserializeInteger: expected ':' starting char\n");
         exit(1);
@@ -283,8 +330,11 @@ int deserializeInteger(char** ch) {
         (*ch)++;
     }
     if (!parsedInteger) {
-        printf("deserializeInteger: expected integer\n");
-        exit(1);
+        char* errorStringMessage = "deserializeInteger: expected integer";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
     if (isNegative) {
         integer = -integer;
@@ -292,22 +342,36 @@ int deserializeInteger(char** ch) {
 
     // Parse ending CRLF
     if (**ch != '\r') {
-        printf("deserializeInteger: expected CRLF ending in string\n");
-        exit(1);
+        char* errorStringMessage = "deserializeInteger: expected CRLF ending in string";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
     (*ch)++;
     if (**ch != '\n') {
-        printf("deserializeInteger: expected CRLF ending in string\n");
-        exit(1);
+        char* errorStringMessage = "deserializeInteger: expected CRLF ending in string";
+        printf("%s\n", errorStringMessage);
+        result.errorMessage = errorStringMessage;
+        result.result = FAILED;
+        return result;
     }
     (*ch)++;
-    return integer;
+
+    result.result = SUCCESS;
+    result.isInteger = 1;
+    result.intValue = integer;
+    return result;
 }
 
-ArrayResult deserializeArrayElements(char** ch) {
+DeserializationResult deserializeArrayElements(char** ch) {
+    DeserializationResult deserialization_result = {0};
     if (**ch != '*') {
-        printf("deserializeArrayElements: expected '*' starting char\n");
-        exit(1);
+        char* errorString = "deserializeArrayElements: expected '*' starting char";
+        printf("%s\n", errorString);
+        deserialization_result.result = FAILED;
+        deserialization_result.errorMessage = errorString;
+        return deserialization_result;
     }
     (*ch)++;
 
@@ -318,8 +382,11 @@ ArrayResult deserializeArrayElements(char** ch) {
             isNull = 1;
             (*ch)++;
         } else {
-            printf("deserializeArrayElements: Invalid null string format, missing 1\n");
-            exit(1);
+            char* errorString = "deserializeArrayElements: Invalid null string format, missing 1";
+            printf("%s\n", errorString);
+            deserialization_result.result = FAILED;
+            deserialization_result.errorMessage = errorString;
+            return deserialization_result;
         }
     }
 
@@ -334,19 +401,28 @@ ArrayResult deserializeArrayElements(char** ch) {
             (*ch)++;
         }
         if (!digitFound) {
-            printf("deserializeArrayElements: expected int telling array size\n");
-            exit(1);
+            char* errorString = "deserializeArrayElements: expected int telling array size";
+            printf("%s\n", errorString);
+            deserialization_result.result = FAILED;
+            deserialization_result.errorMessage = errorString;
+            return deserialization_result;
         }
 
         // Parse array length denominator and first element CRLF
         if (**ch != '\r') {
-            printf("deserializeArrayElements: expected CRLF ending in string\n");
-            exit(1);
+            char* errorString = "deserializeArrayElements: expected CRLF ending in string";
+            printf("%s\n", errorString);
+            deserialization_result.result = FAILED;
+            deserialization_result.errorMessage = errorString;
+            return deserialization_result;
         }
         (*ch)++;
         if (**ch != '\n') {
-            printf("deserializeArrayElements: expected CRLF ending in string\n");
-            exit(1);
+            char* errorString = "deserializeArrayElements: expected CRLF ending in string";
+            printf("%s\n", errorString);
+            deserialization_result.result = FAILED;
+            deserialization_result.errorMessage = errorString;
+            return deserialization_result;
         }
         (*ch)++;
 
@@ -355,54 +431,92 @@ ArrayResult deserializeArrayElements(char** ch) {
         // Parse datatypes
         for (int i = 0; i < arrayLength; i++) {
             if (**ch == '\0') {
-                printf("deserializeArrayElements: unexpected end of array\n");
-                exit(1);
+                char* errorString = "deserializeArrayElements: unexpected end of array";
+                printf("%s\n", errorString);
+                deserialization_result.result = FAILED;
+                deserialization_result.errorMessage = errorString;
+                return deserialization_result;
             }
             TypeResponse type = ResponseType(*ch);
             if (!type.validType) {
-                printf("deserializeArrayElements: array contains non valid type\n");
-                exit(1);
+                char* errorString = "deserializeArrayElements: array contains non valid type";
+                printf("%s\n", errorString);
+                deserialization_result.result = FAILED;
+                deserialization_result.errorMessage = errorString;
+                return deserialization_result;
             }
 
             switch (type.type) {
                 case SSTRING:
-                    char* sstring = deserializeSimpleString(ch);
-                    array[i].stringResponse = sstring;
+                    DeserializationResult simpleResult = deserializeSimpleString(ch);
+                    if (simpleResult.result == FAILED) {
+                        return simpleResult;
+                    }
+                    array[i].stringResponse = simpleResult.content;
                     array[i].type = SSTRING;
                     break;
                 case BSTRING:
-                    char* bstring = deserializeBulkStrings(ch);
-                    array[i].stringResponse = bstring;
+                    DeserializationResult bulkResult = deserializeBulkStrings(ch);
+                    if (bulkResult.result == FAILED) {
+                        return bulkResult;
+                    }
+                    array[i].stringResponse = bulkResult.content;
                     array[i].type = BSTRING;
                     break;
                 case ERROR:
-                    char* errorString = deserializeError(ch);
-                    array[i].stringResponse = errorString;
+                    DeserializationResult errorResult = deserializeError(ch);
+                    if (errorResult.result == FAILED) {
+                        return errorResult;
+                    }
+                    array[i].stringResponse = errorResult.content;
                     array[i].type = ERROR;
                     break;
                 case INTEGER:
-                    int integer = deserializeInteger(ch);
-                    array[i].intValue = integer;
+                    DeserializationResult integerResult = deserializeInteger(ch);
+                    if (integerResult.result == FAILED) {
+                        return integerResult;
+                    }
+                    if (!integerResult.isInteger) {
+                        integerResult.result = FAILED;
+                        integerResult.errorMessage = "deserializeInteger: result does not indicate integer type";
+                        return integerResult;
+                    }
+                    array[i].intValue = integerResult.intValue;
                     array[i].type = INTEGER;
                     break;
                 case ARRAY:
-                    ArrayResult resArray = deserializeArrayElements(ch);
-                    array[i].array = resArray.array;
+                    DeserializationResult resArray = deserializeArrayElements(ch);
+                    if (resArray.result == FAILED) {
+                        return resArray;
+                    }
+                    if (!resArray.isArray) {
+                        resArray.result = FAILED;
+                        resArray.errorMessage = "deserializeArrayElements: result does not indicate array type";
+                        return resArray;
+                    }
+                    array[i].array = resArray.array.array;
                     array[i].type = ARRAY;
-                    array[i].arrayElementLength = resArray.length;
+                    array[i].arrayElementLength = resArray.array.length;
                     break;
                 default:
-                    printf("deserializeArrayElements: unexpected type\n");
-                    exit(1);
+                    char* errorStringMessage = "deserializeArrayElements: unexpected type";
+                    printf("%s\n", errorStringMessage);
+                    deserialization_result.result = FAILED;
+                    deserialization_result.errorMessage = errorStringMessage;
+                    return deserialization_result;
             }
         }
     }
 
-
     ArrayResult result;
     result.array = array;
     result.length = arrayLength;
-    return result;
+
+    deserialization_result.result = SUCCESS;
+    deserialization_result.isArray = 1;
+    deserialization_result.array = result;
+
+    return deserialization_result;
 
 }
 
@@ -675,7 +789,7 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
                 result = concatA;
                 break;
             default:
-                printf("deserializeEmbeddedArray: unexpected type\n");
+                printf("arrayResponseConcatenator: unexpected type\n");
                 exit(1);
         }
     }
@@ -706,7 +820,7 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
                 result = concatA;
                 break;
             default:
-                printf("deserializeEmbeddedArray: unexpected type\n");
+                printf("arrayResponseConcatenator: unexpected type\n");
                 exit(1);
         }
     }
@@ -747,22 +861,27 @@ char* deserializeEmbeddedArray(ArrayElement* array, int length) {
 
 // TODO Need logic for reallocation if init size in deserialize array functions gets exceeded.
 
-char* deserializeArray(char** ch) {
+DeserializationResult deserializeArray(char** ch) {
     if (**ch != '*') {
         printf("deserializeArray: expected '*' to start array sequence\n");
         exit(1);
     }
     int initSize = 50;
 
-    ArrayResult arrayRes = deserializeArrayElements(ch);
-    int arrayLength = arrayRes.length;
-    ArrayElement* array = arrayRes.array;
+    DeserializationResult arrayRes = deserializeArrayElements(ch);
+    if (arrayRes.result == FAILED) {
+        return arrayRes;
+    }
+    int arrayLength = arrayRes.array.length;
+    ArrayElement* array = arrayRes.array.array;
 
     if (arrayLength == 0) {
         char* emptyArray = malloc(2*sizeof(char) + 1);
         strcpy(emptyArray, "[]");
         emptyArray[2] = '\0';
-        return emptyArray;
+        arrayRes.result = SUCCESS;
+        arrayRes.content = emptyArray;
+        return arrayRes;
     }
 
     char* result = malloc(initSize*sizeof(char));
@@ -783,37 +902,87 @@ char* deserializeArray(char** ch) {
         }
     }
 
-    return result;
-
+    arrayRes.content = result;
+    arrayRes.result = SUCCESS;
+    return arrayRes;
 }
 
-char* deserializeRequest(char** ch) {
+DeserializeRequestResult deserializeRequest(char** ch) {
+    DeserializeRequestResult result = {0};
+    DeserializationResult deserialization_result = {0};
     switch (**ch) {
         case '*':
-            return deserializeArray(ch);
+            deserialization_result = deserializeArray(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                result.content = deserialization_result.content;
+            }
+            return result;
             break;
         case '+':
-            return deserializeSimpleString(ch);
+            deserialization_result = deserializeSimpleString(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                result.content = deserialization_result.content;
+            }
+            return result;
             break;
         case '-':
-            return deserializeError(ch);
+            deserialization_result = deserializeError(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                result.content = deserialization_result.content;
+            }
+            return result;
             break;
         case '$':
-            return deserializeBulkStrings(ch);
+            deserialization_result = deserializeBulkStrings(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                result.content = deserialization_result.content;
+            }
+            return result;
             break;
         case ':':
-            int res = deserializeInteger(ch);
-            int length = snprintf(NULL, 0, "%d", res);
-            char* stringVersion = malloc(length + 1);
-            sprintf(stringVersion, "%d", res);
-            if (stringVersion == NULL) {
-                printf("deserializeRequest: error malloc deserializeInteger\n");
-                exit(1);
+            deserialization_result = deserializeInteger(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                if (!deserialization_result.isInteger) {
+                    printf("deserializeRequest: Deserialization of integer, did not return 'isInteger' of type true\n");
+                    exit(1);
+                }
+                int res = deserialization_result.intValue;
+                int length = snprintf(NULL, 0, "%d", res);
+                char* stringVersion = malloc(length + 1);
+                sprintf(stringVersion, "%d", res);
+                if (stringVersion == NULL) {
+                    printf("deserializeRequest: error malloc deserializeInteger\n");
+                    exit(1);
+                }
+                result.content = stringVersion;
             }
-            return stringVersion;
+
+            return result;
             break;
         default:
-            return NULL;
+            result.result = FAILED;
+            result.errorMessage = "Type does not exist";
+            return result;
             break;
     }
 }

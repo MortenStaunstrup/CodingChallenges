@@ -7,8 +7,8 @@
 #include "Tests.h"
 
 typedef enum  {
-    SUCCESS,
-    FAILURE
+    FAILED,
+    SUCCESS
 } Result;
 
 typedef struct ArrayElement {
@@ -32,22 +32,29 @@ typedef struct {
     union {
         char* content;
         int intValue;
-        ArrayResult* array;
+        ArrayResult array;
     };
     Result result;
+    char* errorMessage;
 } DeserializationResult;
 
-char* deserializeSimpleString(char** ch);
+typedef struct {
+    Result result;
+    char* errorMessage;
+    char* content;
+} DeserializeRequestResult;
 
-char* deserializeBulkStrings(char** ch);
+DeserializationResult deserializeSimpleString(char** ch);
+
+DeserializationResult deserializeBulkStrings(char** ch);
 
 char* concatenate(char* string1, char* string2);
 
-char* deserializeError(char** ch);
+DeserializationResult deserializeError(char** ch);
 
-int deserializeInteger(char** ch);
+DeserializationResult deserializeInteger(char** ch);
 
-ArrayResult deserializeArrayElements(char** ch);
+DeserializationResult deserializeArrayElements(char** ch);
 
 char* arrayConcatenate(char* string1, char* string2, int isString);
 
@@ -61,8 +68,8 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
 
 char* deserializeEmbeddedArray(ArrayElement* array, int length);
 
-char* deserializeArray(char** ch);
+DeserializationResult deserializeArray(char** ch);
 
-char* deserializeRequest(char** ch);
+DeserializeRequestResult deserializeRequest(char** ch);
 
 #endif //REDISSERVER_DESERIALIZATION_H

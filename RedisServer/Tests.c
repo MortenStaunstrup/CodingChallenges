@@ -9,32 +9,34 @@
 
 void RunDeserializationTests() {
 
-    CreateDeserializationTests res = CreateDeserializationTestsFunction();
+    CreateDeserializationTests testResult = CreateDeserializationTestsFunction();
 
-    for (int i = 0; i < res.amountOfTests; i++) {
-        TypeResponse t = ResponseType(res.tests[i]);
-        char* result = deserializeRequest(&res.tests[i]);
-        if (result == NULL) {
-            if (res.expected[i] == NULL) {
-                printf("Test: %d PASSED\n", i);
-            } else {
-                printf("Test: %d FAILED\n", i);
-                printf("Result is null, but expected: %s\n", res.expected[i]);
-            }
-        } else if (strcmp(result, res.expected[i]) == 0) {
-            printf("Test: %d PASSED\n", i);
-        } else {
-            printf("Test: %d FAILED\n", i);
-            printf("Result: %s\nExpected: %s\n", result, res.expected[i]);
-        }
-        if (!t.validType) {
-            printf("Invalid type\n");
+    for (int i = 0; i < testResult.amountOfTests; i++) {
+        DeserializeRequestResult result = deserializeRequest(&testResult.tests[i]);
+        int testCase = i + 1;
+        switch (result.result) {
+            case SUCCESS:
+                if (testResult.expectFailed[i] == 1) {
+                    printf("Test %d: FAILED\nExpected parsing failure response, but got SUCCESS\n", testCase);
+                } else if (result.content == NULL || strcmp(testResult.expected[i], result.content) == 0) {
+                    printf("Test %d: PASSED\n", testCase);
+                } else {
+                    printf("Test %d: FAILED\nExpected \"%s\" but got \"%s\"", testCase, testResult.expected[i], result.content);
+                }
+                break;
+            case FAILED:
+                if (testResult.expectFailed[i] == 1) {
+                    printf("Test %d: PASSED with failure message: %s\n", testCase, result.errorMessage);
+                } else {
+                    printf("Test %d: FAILED\nDid not expect parsing to fail. Error message: %s\n", testCase, result.errorMessage);
+                }
+                break;
         }
     }
 
-    free(res.tests);
-    free(res.expected);
-    free(res.expectFailed);
+    free(testResult.tests);
+    free(testResult.expected);
+    free(testResult.expectFailed);
 }
 
 
@@ -67,7 +69,7 @@ TypeResponse ResponseType(char* ch) {
 
 CreateDeserializationTests CreateDeserializationTestsFunction() {
     CreateDeserializationTests res;
-    res.amountOfTests = 13;
+    res.amountOfTests = 15;
     char** tests;
     char** expectedParsedResponses;
     int* expectedFailedResponse;
@@ -121,7 +123,7 @@ CreateDeserializationTests CreateDeserializationTestsFunction() {
     tests[13] = "$9\r\nHey\r\nMy G\r\n";
     expectedParsedResponses[13] = "Hey\r\nMy G";
 
-    tests[14] = "$21\r\nHello my name is Carl";
+    tests[14] = "$21\r\nHello my name is Carl\r\n";
     expectedParsedResponses[14] = "Hello my name is Carl";
 
     res.tests = tests;
