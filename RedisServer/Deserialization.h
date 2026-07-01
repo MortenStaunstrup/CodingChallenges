@@ -6,49 +6,13 @@
 #define REDISSERVER_DESERIALIZATION_H
 #include "Tests.h"
 
-typedef enum  {
-    FAILED,
-    SUCCESS
-} Result;
 
-typedef struct ArrayElement {
-    Type type;
-    union {
-        char* stringResponse;
-        int intValue;
-        struct ArrayElement* array;
-    };
-    int arrayElementLength;
-} ArrayElement;
-
-typedef struct {
-    int length;
-    ArrayElement* array;
-} ArrayResult;
-
-typedef struct {
-    int isInteger;
-    int isArray;
-    union {
-        char* content;
-        int intValue;
-        ArrayResult array;
-    };
-    Result result;
-    char* errorMessage;
-} DeserializationResult;
-
-typedef struct {
-    Result result;
-    char* errorMessage;
-    char* content;
-} DeserializeRequestResult;
 
 DeserializationResult deserializeSimpleString(char** ch);
 
 DeserializationResult deserializeBulkStrings(char** ch);
 
-char* concatenate(char* string1, char* string2);
+char* concatenateWithSpace(char* string1, char* string2);
 
 DeserializationResult deserializeError(char** ch);
 

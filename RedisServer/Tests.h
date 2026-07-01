@@ -5,25 +5,7 @@
 #ifndef REDISSERVER_TESTS_H
 #define REDISSERVER_TESTS_H
 
-typedef enum {
-    SSTRING,
-    ERROR,
-    INTEGER,
-    BSTRING,
-    ARRAY
-} Type;
-
-typedef struct {
-    int amountOfTests;
-    char** tests;
-    char** expected;
-    int* expectFailed;
-} CreateDeserializationTests;
-
-typedef struct {
-    int validType;
-    Type type;
-} TypeResponse;
+#include "Structs.h"
 
 TypeResponse ResponseType(char* ch);
 

@@ -7,4 +7,8 @@ add_executable(RedisServer main.c
         Tests.h
         Tests.c
         Deserialization.h
-        Deserialization.c)
+        Deserialization.c
+        Serialization.h
+        Serialization.c
+        Structs.h)
+target_link_libraries(RedisServer ws2_32)

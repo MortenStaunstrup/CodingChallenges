@@ -45,19 +45,19 @@ TypeResponse ResponseType(char* ch) {
     t.validType = 1;
     switch (*ch) {
         case '+':
-            t.type = SSTRING;
+            t.type = TYPE_SSTRING;
             break;
         case '-':
-            t.type = ERROR;
+            t.type = TYPE_ERROR;
             break;
         case ':':
-            t.type = INTEGER;
+            t.type = TYPE_INTEGER;
             break;
         case '$':
-            t.type = BSTRING;
+            t.type = TYPE_BSTRING;
             break;
         case '*':
-            t.type = ARRAY;
+            t.type = TYPE_ARRAY;
             break;
         default:
             t.validType = 0;
@@ -69,7 +69,7 @@ TypeResponse ResponseType(char* ch) {
 
 CreateDeserializationTests CreateDeserializationTestsFunction() {
     CreateDeserializationTests res;
-    res.amountOfTests = 15;
+    res.amountOfTests = 16;
     char** tests;
     char** expectedParsedResponses;
     int* expectedFailedResponse;
@@ -125,6 +125,10 @@ CreateDeserializationTests CreateDeserializationTestsFunction() {
 
     tests[14] = "$21\r\nHello my name is Carl\r\n";
     expectedParsedResponses[14] = "Hello my name is Carl";
+
+    // Is "11" because there are 11 bytes in this string, "éøæûü" all count as 2 bytes each
+    tests[15] = "$11\r\néRøæûü\r\n";
+    expectedParsedResponses[15] = "éRøæûü";
 
     res.tests = tests;
     res.expected = expectedParsedResponses;

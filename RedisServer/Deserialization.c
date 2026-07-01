@@ -168,10 +168,10 @@ DeserializationResult deserializeBulkStrings(char** ch) {
     return result;
 }
 
-char* concatenate(char* string1, char* string2) {
+char* concatenateWithSpace(char* string1, char* string2) {
     char* result = (char*)malloc(strlen(string1) + strlen(string2) + 2);
     if (result == NULL) {
-        printf("concatenate: malloc failed\n");
+        printf("concatenateWithSpace: malloc failed\n");
         exit(1);
     }
     strcpy(result, string1);
@@ -300,7 +300,7 @@ DeserializationResult deserializeError(char** ch) {
     (*ch)++;
 
     result.result = SUCCESS;
-    result.content = concatenate(errorString, messageString);
+    result.content = concatenateWithSpace(errorString, messageString);
     return result;
 }
 
@@ -447,31 +447,31 @@ DeserializationResult deserializeArrayElements(char** ch) {
             }
 
             switch (type.type) {
-                case SSTRING:
+                case TYPE_SSTRING:
                     DeserializationResult simpleResult = deserializeSimpleString(ch);
                     if (simpleResult.result == FAILED) {
                         return simpleResult;
                     }
                     array[i].stringResponse = simpleResult.content;
-                    array[i].type = SSTRING;
+                    array[i].type = TYPE_SSTRING;
                     break;
-                case BSTRING:
+                case TYPE_BSTRING:
                     DeserializationResult bulkResult = deserializeBulkStrings(ch);
                     if (bulkResult.result == FAILED) {
                         return bulkResult;
                     }
                     array[i].stringResponse = bulkResult.content;
-                    array[i].type = BSTRING;
+                    array[i].type = TYPE_BSTRING;
                     break;
-                case ERROR:
+                case TYPE_ERROR:
                     DeserializationResult errorResult = deserializeError(ch);
                     if (errorResult.result == FAILED) {
                         return errorResult;
                     }
                     array[i].stringResponse = errorResult.content;
-                    array[i].type = ERROR;
+                    array[i].type = TYPE_ERROR;
                     break;
-                case INTEGER:
+                case TYPE_INTEGER:
                     DeserializationResult integerResult = deserializeInteger(ch);
                     if (integerResult.result == FAILED) {
                         return integerResult;
@@ -482,9 +482,9 @@ DeserializationResult deserializeArrayElements(char** ch) {
                         return integerResult;
                     }
                     array[i].intValue = integerResult.intValue;
-                    array[i].type = INTEGER;
+                    array[i].type = TYPE_INTEGER;
                     break;
-                case ARRAY:
+                case TYPE_ARRAY:
                     DeserializationResult resArray = deserializeArrayElements(ch);
                     if (resArray.result == FAILED) {
                         return resArray;
@@ -495,7 +495,7 @@ DeserializationResult deserializeArrayElements(char** ch) {
                         return resArray;
                     }
                     array[i].array = resArray.array.array;
-                    array[i].type = ARRAY;
+                    array[i].type = TYPE_ARRAY;
                     array[i].arrayElementLength = resArray.array.length;
                     break;
                 default:
@@ -707,25 +707,25 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
 
     if (isStart) {
         switch (array[0].type) {
-            case SSTRING:
+            case TYPE_SSTRING:
                 char* concat = arrayConcatenateStart(result, array[0].stringResponse, 1);
                 result = concat;
                 break;
-            case BSTRING:
+            case TYPE_BSTRING:
                 char* concatB = arrayConcatenateStart(result, array[0].stringResponse, 1);
                 result = concatB;
                 break;
-            case ERROR:
+            case TYPE_ERROR:
                 char* concatE = arrayConcatenateStart(result, array[0].stringResponse, 0);
                 result = concatE;
                 break;
-            case INTEGER:
+            case TYPE_INTEGER:
                 char intBuffer[20];
                 sprintf(intBuffer, "%d", array[0].intValue);
                 char* concatI = arrayConcatenateStart(result, intBuffer, 0);
                 result = concatI;
                 break;
-            case ARRAY:
+            case TYPE_ARRAY:
                 char* embeddedArray = deserializeEmbeddedArray(array[0].array, array[0].arrayElementLength);
                 char* concatA = arrayConcatenateStart(result, embeddedArray, 0);
                 result = concatA;
@@ -736,25 +736,25 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
         }
     } else if (hasOneElement) {
         switch (array[0].type) {
-            case SSTRING:
+            case TYPE_SSTRING:
                 char* concat = arrayConcatenateOneElement(result, array[0].stringResponse, 1);
                 result = concat;
                 break;
-            case BSTRING:
+            case TYPE_BSTRING:
                 char* concatB = arrayConcatenateOneElement(result, array[0].stringResponse, 1);
                 result = concatB;
                 break;
-            case ERROR:
+            case TYPE_ERROR:
                 char* concatE = arrayConcatenateOneElement(result, array[0].stringResponse, 0);
                 result = concatE;
                 break;
-            case INTEGER:
+            case TYPE_INTEGER:
                 char intBuffer[20];
                 sprintf(intBuffer, "%d", array[0].intValue);
                 char* concatI = arrayConcatenateOneElement(result, intBuffer, 0);
                 result = concatI;
                 break;
-            case ARRAY:
+            case TYPE_ARRAY:
                 char* embeddedArray = deserializeEmbeddedArray(array[0].array, array[0].arrayElementLength);
                 char* concatA = arrayConcatenateOneElement(result, embeddedArray, 0);
                 result = concatA;
@@ -765,25 +765,25 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
         }
     } else if (isEnd) {
         switch (array[index].type) {
-            case SSTRING:
+            case TYPE_SSTRING:
                 char* concat = arrayConcatenateEnd(result, array[index].stringResponse, 1);
                 result = concat;
                 break;
-            case BSTRING:
+            case TYPE_BSTRING:
                 char* concatB = arrayConcatenateEnd(result, array[index].stringResponse, 1);
                 result = concatB;
                 break;
-            case ERROR:
+            case TYPE_ERROR:
                 char* concatE = arrayConcatenateEnd(result, array[index].stringResponse, 0);
                 result = concatE;
                 break;
-            case INTEGER:
+            case TYPE_INTEGER:
                 char intBuffer[20];
                 sprintf(intBuffer, "%d", array[1].intValue);
                 char* concatI = arrayConcatenateEnd(result, intBuffer, 0);
                 result = concatI;
                 break;
-            case ARRAY:
+            case TYPE_ARRAY:
                 char* embeddedArray = deserializeEmbeddedArray(array[index].array, array[index].arrayElementLength);
                 char* concatA = arrayConcatenateEnd(result, embeddedArray, 0);
                 result = concatA;
@@ -796,25 +796,25 @@ char* arrayResponseConcatenator(char* result, ArrayElement* array, int index, in
 
     if (!isEnd && !isStart && !hasOneElement) {
         switch (array[index].type) {
-            case SSTRING:
+            case TYPE_SSTRING:
                 char* concat = arrayConcatenate(result, array[index].stringResponse, 1);
                 result = concat;
                 break;
-            case BSTRING:
+            case TYPE_BSTRING:
                 char* concatB = arrayConcatenate(result, array[index].stringResponse, 1);
                 result = concatB;
                 break;
-            case ERROR:
+            case TYPE_ERROR:
                 char* concatE = arrayConcatenate(result, array[index].stringResponse, 0);
                 result = concatE;
                 break;
-            case INTEGER:
+            case TYPE_INTEGER:
                 char intBuffer[20];
                 sprintf(intBuffer, "%d", array[1].intValue);
                 char* concatI = arrayConcatenate(result, intBuffer, 0);
                 result = concatI;
                 break;
-            case ARRAY:
+            case TYPE_ARRAY:
                 char* embeddedArray = deserializeEmbeddedArray(array[index].array, array[index].arrayElementLength);
                 char* concatA = arrayConcatenate(result, embeddedArray, 0);
                 result = concatA;

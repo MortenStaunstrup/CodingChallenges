@@ -119,3 +119,24 @@ Usage:
 ./run_tests.sh ./<calculator exe name> Tests.txt
 ```
 You might need to chmod the .sh file for executing priveleges  
+
+### Redis Server
+
+**Use GNU compiler to compile...**
+**IMPORTANT!!! Use: gcc main.c -o <name> -lws2_32 to compile**
+**ONLY WORKS ON WINDOWS**
+
+**Or use the .exe in folder**
+
+The program requires **Docker** to be installed, either CLI or desktop version for compatibility between all operating systems  
+*If redis-cli is installed on your pc, the above step and below command with Docker is not required*  
+
+To run commands use:
+```
+docker run -it --rm redis:7 redis-cli -h host.docker.internal -p 6379 <COMMANDS>
+```
+
+Basic usage:
+```
+
+```
