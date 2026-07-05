@@ -12,7 +12,7 @@ void RunDeserializationTests() {
     CreateDeserializationTests testResult = CreateDeserializationTestsFunction();
 
     for (int i = 0; i < testResult.amountOfTests; i++) {
-        DeserializeRequestResult result = deserializeRequest(&testResult.tests[i]);
+        ClientRequestResult result = deserializeRequest(&testResult.tests[i]);
         int testCase = i + 1;
         switch (result.result) {
             case SUCCESS:
@@ -37,6 +37,82 @@ void RunDeserializationTests() {
     free(testResult.tests);
     free(testResult.expected);
     free(testResult.expectFailed);
+}
+
+// Deserializes all types of requests, and returns their raw form eg. +Hello = Hello, $5 Dog T = Dog T
+// You know what, check tests.c for expected results from deserialization requests
+ClientRequestResult deserializeRequest(char** ch) {
+    ClientRequestResult result = {0};
+    DeserializationResult deserialization_result = {0};
+    switch (**ch) {
+        case '*':
+            deserialization_result = deserializeArray(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                result.content = deserialization_result.content;
+            }
+            return result;
+        case '+':
+            deserialization_result = deserializeSimpleString(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                result.content = deserialization_result.content;
+            }
+            return result;
+        case '-':
+            deserialization_result = deserializeError(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                result.content = deserialization_result.content;
+            }
+            return result;
+        case '$':
+            deserialization_result = deserializeBulkStrings(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                result.content = deserialization_result.content;
+            }
+            return result;
+        case ':':
+            deserialization_result = deserializeInteger(ch);
+            if (deserialization_result.result == FAILED) {
+                result.result = FAILED;
+                result.errorMessage = deserialization_result.errorMessage;
+            } else {
+                result.result = SUCCESS;
+                if (!deserialization_result.isInteger) {
+                    printf("deserializeRequest: Deserialization of integer, did not return 'isInteger' of type true\n");
+                    exit(1);
+                }
+                int res = deserialization_result.intValue;
+                int length = snprintf(NULL, 0, "%d", res);
+                char* stringVersion = malloc(length + 1);
+                sprintf(stringVersion, "%d", res);
+                if (stringVersion == NULL) {
+                    printf("deserializeRequest: error malloc deserializeInteger\n");
+                    exit(1);
+                }
+                result.content = stringVersion;
+            }
+
+            return result;
+        default:
+            result.result = FAILED;
+            result.errorMessage = "Type does not exist";
+            return result;
+    }
 }
 
 

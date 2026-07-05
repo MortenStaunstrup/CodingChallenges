@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "Deserialization.h"
+#include "Serialization.h"
 
 DeserializationResult deserializeSimpleString(char** ch) {
     DeserializationResult result = {0};
@@ -121,7 +122,7 @@ DeserializationResult deserializeBulkStrings(char** ch) {
 
         // Parse data
 
-        string = (char*)malloc(length * sizeof(char));
+        string = (char*)malloc(length * sizeof(char) + 1);
         if (string == NULL) {
             printf("deserializeBulkStrings: malloc failed\n");
             exit(1);
@@ -907,82 +908,157 @@ DeserializationResult deserializeArray(char** ch) {
     return arrayRes;
 }
 
-DeserializeRequestResult deserializeRequest(char** ch) {
-    DeserializeRequestResult result = {0};
-    DeserializationResult deserialization_result = {0};
-    switch (**ch) {
-        case '*':
-            deserialization_result = deserializeArray(ch);
-            if (deserialization_result.result == FAILED) {
-                result.result = FAILED;
-                result.errorMessage = deserialization_result.errorMessage;
-            } else {
-                result.result = SUCCESS;
-                result.content = deserialization_result.content;
-            }
-            return result;
-            break;
-        case '+':
-            deserialization_result = deserializeSimpleString(ch);
-            if (deserialization_result.result == FAILED) {
-                result.result = FAILED;
-                result.errorMessage = deserialization_result.errorMessage;
-            } else {
-                result.result = SUCCESS;
-                result.content = deserialization_result.content;
-            }
-            return result;
-            break;
-        case '-':
-            deserialization_result = deserializeError(ch);
-            if (deserialization_result.result == FAILED) {
-                result.result = FAILED;
-                result.errorMessage = deserialization_result.errorMessage;
-            } else {
-                result.result = SUCCESS;
-                result.content = deserialization_result.content;
-            }
-            return result;
-            break;
-        case '$':
-            deserialization_result = deserializeBulkStrings(ch);
-            if (deserialization_result.result == FAILED) {
-                result.result = FAILED;
-                result.errorMessage = deserialization_result.errorMessage;
-            } else {
-                result.result = SUCCESS;
-                result.content = deserialization_result.content;
-            }
-            return result;
-            break;
-        case ':':
-            deserialization_result = deserializeInteger(ch);
-            if (deserialization_result.result == FAILED) {
-                result.result = FAILED;
-                result.errorMessage = deserialization_result.errorMessage;
-            } else {
-                result.result = SUCCESS;
-                if (!deserialization_result.isInteger) {
-                    printf("deserializeRequest: Deserialization of integer, did not return 'isInteger' of type true\n");
-                    exit(1);
-                }
-                int res = deserialization_result.intValue;
-                int length = snprintf(NULL, 0, "%d", res);
-                char* stringVersion = malloc(length + 1);
-                sprintf(stringVersion, "%d", res);
-                if (stringVersion == NULL) {
-                    printf("deserializeRequest: error malloc deserializeInteger\n");
-                    exit(1);
-                }
-                result.content = stringVersion;
-            }
-
-            return result;
-            break;
-        default:
-            result.result = FAILED;
-            result.errorMessage = "Type does not exist";
-            return result;
-            break;
+ClientCommandsResult deserializeClientArray(char** ch) {
+    ClientCommandsResult deserialization_result = {0};
+    if (**ch != '*') {
+        deserialization_result.result = FAILED;
+        deserialization_result.errorMessage = "deserializeClientArray: expected '*'";
+        return deserialization_result;
     }
+
+    (*ch)++;
+
+    int digitFound = 0;
+    int arrayLength = 0;
+
+    while (isdigit(**ch)) {
+        digitFound = 1;
+        arrayLength = arrayLength * 10 + (**ch - '0');
+        (*ch)++;
+    }
+    if (!digitFound) {
+        char* errorString = "deserializeClientArray: expected int telling array size";
+        printf("%s\n", errorString);
+        deserialization_result.result = FAILED;
+        deserialization_result.errorMessage = errorString;
+        return deserialization_result;
+    }
+
+    // Parse array length denominator and first element CRLF
+    if (**ch != '\r') {
+        char* errorString = "deserializeClientArray: expected CRLF ending in string";
+        printf("%s\n", errorString);
+        deserialization_result.result = FAILED;
+        deserialization_result.errorMessage = errorString;
+        return deserialization_result;
+    }
+    (*ch)++;
+    if (**ch != '\n') {
+        char* errorString = "deserializeClientArray: expected CRLF ending in string";
+        printf("%s\n", errorString);
+        deserialization_result.result = FAILED;
+        deserialization_result.errorMessage = errorString;
+        return deserialization_result;
+    }
+    (*ch)++;
+
+    int maxCommands = 50;
+    char** commands = malloc(sizeof(char*) * (maxCommands + 1));
+
+    int index = 0;
+    while (index < arrayLength) {
+        DeserializationResult bulkResult = deserializeBulkStrings(ch);
+        if (bulkResult.result == FAILED) {
+            deserialization_result.result = FAILED;
+            deserialization_result.errorMessage = bulkResult.errorMessage;
+            free(commands);
+            free(bulkResult.content);
+            return deserialization_result;
+        }
+
+        commands[index++] = bulkResult.content;
+    }
+
+    commands[index] = '\0';
+
+    deserialization_result.result = SUCCESS;
+    deserialization_result.commands = commands;
+    deserialization_result.commandsCount = index;
+    return deserialization_result;
+}
+
+// Handles request from rdcli client
+ClientRequestResult handleClientRequest(char** ch) {
+    ClientRequestResult result = {0};
+
+    ClientCommandsResult arrayRes = deserializeClientArray(ch);
+
+    if (arrayRes.result == SUCCESS) {
+        for (int i = 0; i < arrayRes.commandsCount; i++) {
+            printf("%s\n", arrayRes.commands[i]);
+        }
+
+        ClientRequestResult commandsHandled = handleCommands(arrayRes);
+        if (commandsHandled.result == FAILED) {
+            result.result = FAILED;
+            result.errorMessage = commandsHandled.errorMessage;
+            return result;
+        }
+
+        result.result = SUCCESS;
+        result.content = commandsHandled.content;
+        result.contentLength = commandsHandled.contentLength;
+        return result;
+
+    } else {
+        printf("Error: %s\n", arrayRes.errorMessage);
+        result.result = FAILED;
+        result.errorMessage = arrayRes.errorMessage;
+        return result;
+    }
+
+}
+
+ClientRequestResult handleCommands(ClientCommandsResult clientCommandsResult) {
+    ClientRequestResult result = {0};
+
+    if (clientCommandsResult.result == FAILED) {
+        result.result = FAILED;
+        result.errorMessage = clientCommandsResult.errorMessage;
+        return result;
+    }
+
+    if (clientCommandsResult.commandsCount <= 0) {
+        result.result = FAILED;
+        char* errorString = "Does not contain any commands";
+        result.errorMessage = errorString;
+        return result;
+    }
+
+    if (strcmp(clientCommandsResult.commands[0], "PING") == 0) {
+        char* pong = "POLO";
+        SerializationRequestResult pongSerializationResult = SerializeSimpleString(&pong);
+        if (pongSerializationResult.result == SUCCESS) {
+            result.content = pongSerializationResult.content;
+            result.result = SUCCESS;
+            result.contentLength = pongSerializationResult.contentLength;
+            return result;
+        } else {
+            result.result = FAILED;
+            result.errorMessage = pongSerializationResult.errorMessage;
+            return result;
+        }
+    }
+
+    if (strcmp(clientCommandsResult.commands[0], "ECHO") == 0) {
+        if (clientCommandsResult.commandsCount < 2) {
+            result.result = FAILED;
+            char* errorString = "Echo command needs something to echo";
+            result.errorMessage = errorString;
+            return result;
+        }
+
+        SerializationRequestResult echoSerializationResult = SerializeBulkString(&clientCommandsResult.commands[1]);
+        if (echoSerializationResult.result == SUCCESS) {
+            result.result = SUCCESS;
+            result.content = echoSerializationResult.content;
+            result.contentLength = echoSerializationResult.contentLength;
+            return result;
+        } else {
+            result.result = FAILED;
+            result.errorMessage = echoSerializationResult.errorMessage;
+            return result;
+        }
+    }
+
 }

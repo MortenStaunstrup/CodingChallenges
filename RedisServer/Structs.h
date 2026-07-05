@@ -62,13 +62,21 @@ typedef struct {
     Result result;
     char* errorMessage;
     char* content;
+    int contentLength;
 } SerializationRequestResult;
 
 typedef struct {
     Result result;
     char* errorMessage;
     char* content;
-} DeserializeRequestResult;
+    int contentLength;
+} ClientRequestResult;
 
+typedef struct {
+    Result result;
+    char* errorMessage;
+    char** commands;
+    int commandsCount;
+} ClientCommandsResult;
 
 #endif //REDISSERVER_STRUCTS_H

@@ -31,9 +31,11 @@ SerializationRequestResult SerializeSimpleString(char** ch) {
         (*ch)++;
     }
     simpleString[index++] = '\r';
-    simpleString[index] = '\n';
+    simpleString[index++] = '\n';
+    simpleString[index] = '\0';
     result.result = SUCCESS;
     result.content = simpleString;
+    result.contentLength = index;
     return result;
 }
 
@@ -65,13 +67,15 @@ SerializationRequestResult SerializeBulkString(char** ch) {
     bulkString[index] = '\0';
 
     char length[25];
-    sprintf(length, "%d", index + 1);
+    sprintf(length, "%d", index);
 
     char* firstCon = concatenate("$", length);
-    char* secondCon = concatenate(firstCon, bulkString);
-    char* finalResult = concatenate(secondCon, "\r\n");
+    char* secondCon = concatenate(firstCon, "\r\n");
+    char* thirdCon = concatenate(secondCon, bulkString);
+    char* finalResult = concatenate(thirdCon, "\r\n");
     result.result = SUCCESS;
     result.content = finalResult;
+    result.contentLength = index + 6 + ((int)strlen(length) - 1);
     return result;
 }
 
@@ -140,10 +144,4 @@ SerializationRequestResult SerializeError(char** ch) {
 
 SerializationRequestResult SerializeArray(char** ch) {
     SerializationRequestResult result = {0};
-}
-
-SerializationRequestResult HandleRequest(char** ch) {
-    // First (and sometimes second) bulkstring in array is a command
-    // Subsequent elements are arguments for the command
-    // The server REPLIES with a RESP type
 }

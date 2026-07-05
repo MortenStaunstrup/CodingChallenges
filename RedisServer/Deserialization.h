@@ -34,6 +34,11 @@ char* deserializeEmbeddedArray(ArrayElement* array, int length);
 
 DeserializationResult deserializeArray(char** ch);
 
-DeserializeRequestResult deserializeRequest(char** ch);
+ClientCommandsResult deserializeClientArray(char** ch);
+
+ClientRequestResult handleClientRequest(char** ch);
+
+ClientRequestResult handleCommands(ClientCommandsResult clientCommandsResult);
+
 
 #endif //REDISSERVER_DESERIALIZATION_H

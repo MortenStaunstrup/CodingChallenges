@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
-    char* buffer = malloc(sizeof(char) * BUFFER_SIZE);
+    char* buffer = malloc(sizeof(char) * BUFFER_SIZE + 1);
     int port = 6379;
 
     // Initialize Winsock
@@ -96,17 +96,19 @@ int main(int argc, char* argv[]) {
                 printf("Connection closed\n");
                 break;
             }
+            buffer[valread] = '\0';
+
             printf("Raw received: %s\n", buffer);
 
             char* p = buffer;
-            DeserializeRequestResult deserializationResult = deserializeRequest(&p);
+            ClientRequestResult deserializationResult = handleClientRequest(&p);
             if (deserializationResult.result == SUCCESS) {
                 printf("Message: %s\n", deserializationResult.content);
-                send(new_socket, deserializationResult.content, sizeof(deserializationResult.content) - 1, 0);
+                printf("Length of message: %d\n", deserializationResult.contentLength);
+                send(new_socket, deserializationResult.content, deserializationResult.contentLength, 0);
             } else {
                 printf("Error message: %s\n", deserializationResult.errorMessage);
-                printf("Message: %s\n", deserializationResult.errorMessage);
-                send(new_socket, deserializationResult.errorMessage, sizeof(deserializationResult.errorMessage) - 1, 0);
+                send(new_socket, deserializationResult.errorMessage, (int)strlen(deserializationResult.errorMessage), 0);
             }
         }
 

@@ -11,6 +11,8 @@ TypeResponse ResponseType(char* ch);
 
 CreateDeserializationTests CreateDeserializationTestsFunction();
 
+ClientRequestResult deserializeRequest(char** ch);
+
 void RunDeserializationTests();
 
 #endif //REDISSERVER_TESTS_H
