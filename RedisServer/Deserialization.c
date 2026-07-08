@@ -9,6 +9,25 @@
 #include "Deserialization.h"
 #include "Serialization.h"
 
+
+#define INIT_TABLE_SIZE 1257
+#define OK_CONTENT_LENGTH 5
+#define NIL_CONTENT_LENGTH 5
+
+static long hash(char *str)
+{
+    long hash = 5381;
+    int c;
+
+    while (c = *str++)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash % INIT_TABLE_SIZE;
+}
+
+HashNode* table[INIT_TABLE_SIZE];
+int nodeCount = 0;
+
 DeserializationResult deserializeSimpleString(char** ch) {
     DeserializationResult result = {0};
     if (**ch != '+') {
@@ -1061,4 +1080,86 @@ ClientRequestResult handleCommands(ClientCommandsResult clientCommandsResult) {
         }
     }
 
+    if (strcmp(clientCommandsResult.commands[0], "set") == 0) {
+        if (clientCommandsResult.commandsCount < 3) {
+            result.result = FAILED;
+            char* errorString = "Set command needs 'key' and 'value'";
+            result.errorMessage = errorString;
+            return result;
+        }
+
+        insertValue(clientCommandsResult.commands[1], clientCommandsResult.commands[2]);
+        result.result = SUCCESS;
+        result.content = sendOKResponse();
+        result.contentLength = OK_CONTENT_LENGTH;
+        return result;
+    }
+
+    if (strcmp(clientCommandsResult.commands[0], "get") == 0) {
+        if (clientCommandsResult.commandsCount < 2) {
+            result.result = FAILED;
+            char* errorString = "Get command needs something to get";
+            result.errorMessage = errorString;
+            return result;
+        }
+
+        char* value = getValue(clientCommandsResult.commands[1]);
+        if (value == NULL) {
+            char* nil = sendNILResponse();
+            result.content = nil;
+            result.contentLength = NIL_CONTENT_LENGTH;
+            result.result = SUCCESS;
+            return result;
+        }
+
+        SerializationRequestResult bulkResult = SerializeBulkString(&value);
+        if (bulkResult.result == SUCCESS) {
+            result.result = SUCCESS;
+            result.content = bulkResult.content;
+            result.contentLength = bulkResult.contentLength;
+            return result;
+        }
+
+        result.result = FAILED;
+        result.errorMessage = bulkResult.errorMessage;
+        return result;
+    }
+
+}
+
+void insertValue(char* key, char* value) {
+    long tableIndex = hash(key);
+    HashNode* n;
+    for (n = table[tableIndex]; n; n = n->next) {
+        if (strcmp(key, n->key) == 0) {
+            n->value = value;
+            return;
+        }
+    }
+
+    n = malloc(sizeof(HashNode));
+    n->key = key;
+    n->value = value;
+    n->next = table[tableIndex];
+    table[tableIndex] = n;
+    nodeCount++;
+}
+
+char* getValue(char* key) {
+    long tableIndex = hash(key);
+    HashNode* n;
+    for (n = table[tableIndex]; n; n = n->next) {
+        if (strcmp(key, n->key) == 0) {
+            return n->value;
+        }
+    }
+    return NULL;
+}
+
+char* sendOKResponse() {
+    return "+OK\r\n";
+}
+
+char* sendNILResponse() {
+    return "$-1\r\n";
 }

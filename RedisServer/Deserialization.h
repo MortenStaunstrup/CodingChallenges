@@ -40,5 +40,12 @@ ClientRequestResult handleClientRequest(char** ch);
 
 ClientRequestResult handleCommands(ClientCommandsResult clientCommandsResult);
 
+void insertValue(char* key, char* value);
+
+char* sendOKResponse();
+
+char* getValue(char* key);
+
+char* sendNILResponse();
 
 #endif //REDISSERVER_DESERIALIZATION_H

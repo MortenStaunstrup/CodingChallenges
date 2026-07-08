@@ -79,4 +79,10 @@ typedef struct {
     int commandsCount;
 } ClientCommandsResult;
 
+typedef struct HashNode {
+    struct HashNode* next;
+    char* value;
+    char* key;
+} HashNode;
+
 #endif //REDISSERVER_STRUCTS_H
